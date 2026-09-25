@@ -8,6 +8,7 @@ import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +29,8 @@ data class IncidentListUiState(
 )
 
 class IncidentListViewModel(
-    private val repository: IncidentRepository = NetworkIncidentRepository()
+    private val repository: IncidentRepository = NetworkIncidentRepository(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -57,7 +59,7 @@ class IncidentListViewModel(
             )
 
             try {
-                val incidents = withContext(Dispatchers.IO) {
+                val incidents = withContext(ioDispatcher) {
                     repository.getIncidents(
                         status = status,
                         severity = severity
@@ -139,7 +141,7 @@ class IncidentListViewModel(
             )
 
             try {
-                val createdIncident = withContext(Dispatchers.IO) {
+                val createdIncident = withContext(ioDispatcher) {
                     repository.createIncident(
                         title = trimmedTitle,
                         description = trimmedDescription,
