@@ -1,8 +1,7 @@
-import { useState, type FormEvent } from 'react'
-import {
-  addIncidentNote,
-  getIncidentTimeline,
-} from '../api/incidents'
+import { useState } from 'react'
+import { getIncidentTimeline } from '../api/incidents'
+import { IncidentNoteForm } from './IncidentNoteForm'
+import { IncidentTimeline } from './IncidentTimeline'
 import type {
   Incident,
   IncidentEvent,
@@ -27,9 +26,6 @@ export function IncidentCard({
   const [timeline, setTimeline] = useState<IncidentEvent[]>([])
   const [timelineVisible, setTimelineVisible] = useState(false)
   const [timelineLoading, setTimelineLoading] = useState(false)
-
-  const [note, setNote] = useState('')
-  const [noteSubmitting, setNoteSubmitting] = useState(false)
 
   const nextStatus: IncidentStatus | null =
     incident.status === 'OPEN'
@@ -96,47 +92,19 @@ export function IncidentCard({
     }
   }
 
-  async function handleNoteSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault()
-
-    const message = note.trim()
-
-    if (!message) {
-      return
-    }
-
-    setNoteSubmitting(true)
-    setError(null)
-
-    try {
-      const createdEvent = await addIncidentNote(
-        incident.id,
-        message
-      )
-
-      setTimeline((currentTimeline) => [
-        ...currentTimeline,
-        createdEvent,
-      ])
-
-      setNote('')
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to add note'
-      )
-    } finally {
-      setNoteSubmitting(false)
-    }
+  function handleNoteAdded(event: IncidentEvent) {
+    setTimeline((currentTimeline) => [
+      ...currentTimeline,
+      event,
+    ])
   }
 
   return (
     <article className="incident-card">
       <div className="incident-card-header">
-        <span className={`severity severity-${incident.severity.toLowerCase()}`}>
+        <span
+          className={`severity severity-${incident.severity.toLowerCase()}`}
+        >
           {incident.severity}
         </span>
 
@@ -177,61 +145,21 @@ export function IncidentCard({
         </button>
       </div>
 
-      {error && <p className="form-error">{error}</p>}
+      {error && (
+        <p className="form-error">
+          {error}
+        </p>
+      )}
 
       {timelineVisible && (
         <section className="timeline">
-          <h4>Timeline</h4>
+          <IncidentTimeline events={timeline} />
 
-          {timeline.length === 0 ? (
-            <p className="timeline-empty">
-              No timeline events.
-            </p>
-          ) : (
-            <ol className="timeline-list">
-              {timeline.map((event) => (
-                <li key={event.id}>
-                  <div className="timeline-event-header">
-                    <strong>
-                      {event.type.replaceAll('_', ' ')}
-                    </strong>
-
-                    <time dateTime={event.createdAt}>
-                      {new Date(event.createdAt).toLocaleString()}
-                    </time>
-                  </div>
-
-                  <p>{event.message}</p>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          <form
-            className="note-form"
-            onSubmit={handleNoteSubmit}
-          >
-            <label>
-              Operational note
-
-              <textarea
-                value={note}
-                onChange={(event) =>
-                  setNote(event.target.value)
-                }
-                placeholder="Add an update for the incident timeline..."
-                rows={3}
-                required
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={noteSubmitting}
-            >
-              {noteSubmitting ? 'Adding...' : 'Add note'}
-            </button>
-          </form>
+          <IncidentNoteForm
+            incidentId={incident.id}
+            onNoteAdded={handleNoteAdded}
+            onError={setError}
+          />
         </section>
       )}
 
