@@ -67,6 +67,53 @@ class NetworkIncidentRepository(
         }
     }
 
+    override fun addIncidentNote(
+        incidentId: Long,
+        message: String
+    ): IncidentTimelineEvent {
+        val connection =
+            URL("$baseUrl/api/incidents/$incidentId/notes")
+                .openConnection() as HttpURLConnection
+
+        return try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.doOutput = true
+
+            connection.setRequestProperty(
+                "Content-Type",
+                "application/json"
+            )
+
+            val requestBody = JSONObject()
+                .put("message", message)
+                .toString()
+
+            connection.outputStream
+                .bufferedWriter()
+                .use { writer ->
+                    writer.write(requestBody)
+                }
+
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException(
+                    "Failed to add incident note: HTTP ${connection.responseCode}"
+                )
+            }
+
+            val response = connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+            parseTimelineEvent(
+                JSONObject(response)
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     override fun updateIncidentStatus(
         incidentId: Long,
         status: IncidentStatus
@@ -151,19 +198,25 @@ class NetworkIncidentRepository(
 
         return buildList {
             for (index in 0 until array.length()) {
-                val item = array.getJSONObject(index)
-
                 add(
-                    IncidentTimelineEvent(
-                        id = item.getLong("id"),
-                        type = IncidentTimelineEventType.valueOf(
-                            item.getString("type")
-                        ),
-                        message = item.getString("message"),
-                        createdAt = item.getString("createdAt")
+                    parseTimelineEvent(
+                        array.getJSONObject(index)
                     )
                 )
             }
         }
+    }
+
+    private fun parseTimelineEvent(
+        item: JSONObject
+    ): IncidentTimelineEvent {
+        return IncidentTimelineEvent(
+            id = item.getLong("id"),
+            type = IncidentTimelineEventType.valueOf(
+                item.getString("type")
+            ),
+            message = item.getString("message"),
+            createdAt = item.getString("createdAt")
+        )
     }
 }

@@ -59,8 +59,16 @@ class MainActivity : ComponentActivity() {
                         timeline = uiState.timeline,
                         isTimelineLoading = uiState.isTimelineLoading,
                         timelineError = uiState.timelineError,
+                        isAddingNote = uiState.isAddingNote,
+                        noteError = uiState.noteError,
                         isUpdating = uiState.updatingIncidentId == incident.id,
                         error = uiState.error,
+                        onAddNote = { message ->
+                            viewModel.addIncidentNote(
+                                incidentId = incident.id,
+                                message = message
+                            )
+                        },
                         onStatusChange = { newStatus ->
                             viewModel.updateIncidentStatus(
                                 incidentId = incident.id,

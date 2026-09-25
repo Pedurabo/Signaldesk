@@ -13,6 +13,11 @@ interface IncidentRepository {
         incidentId: Long
     ): List<IncidentTimelineEvent>
 
+    fun addIncidentNote(
+        incidentId: Long,
+        message: String
+    ): IncidentTimelineEvent
+
     fun updateIncidentStatus(
         incidentId: Long,
         status: IncidentStatus
@@ -53,6 +58,18 @@ class FakeIncidentRepository : IncidentRepository {
         incidentId: Long
     ): List<IncidentTimelineEvent> {
         return emptyList()
+    }
+
+    override fun addIncidentNote(
+        incidentId: Long,
+        message: String
+    ): IncidentTimelineEvent {
+        return IncidentTimelineEvent(
+            id = 1,
+            type = com.signaldesk.android.incident.IncidentTimelineEventType.NOTE_ADDED,
+            message = message,
+            createdAt = ""
+        )
     }
 
     override fun updateIncidentStatus(

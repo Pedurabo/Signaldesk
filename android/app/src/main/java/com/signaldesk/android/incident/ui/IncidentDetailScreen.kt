@@ -15,8 +15,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.signaldesk.android.incident.Incident
@@ -30,12 +36,31 @@ fun IncidentDetailScreen(
     timeline: List<IncidentTimelineEvent>,
     isTimelineLoading: Boolean,
     timelineError: String?,
+    isAddingNote: Boolean,
+    noteError: String?,
     isUpdating: Boolean,
     error: String?,
+    onAddNote: (String) -> Unit,
     onStatusChange: (IncidentStatus) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var noteText by remember(incident.id) {
+        mutableStateOf("")
+    }
+
+    var wasAddingNote by remember(incident.id) {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(isAddingNote) {
+        if (wasAddingNote && !isAddingNote && noteError == null) {
+            noteText = ""
+        }
+
+        wasAddingNote = isAddingNote
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         topBar = {
@@ -181,6 +206,50 @@ fun IncidentDetailScreen(
             if (error != null) {
                 Text(
                     text = error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            Text(
+                text = "Add investigation note",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            OutlinedTextField(
+                value = noteText,
+                onValueChange = {
+                    noteText = it
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isAddingNote,
+                label = {
+                    Text("Note")
+                },
+                placeholder = {
+                    Text("What did you discover?")
+                },
+                minLines = 3
+            )
+
+            Button(
+                onClick = {
+                    onAddNote(noteText)
+                },
+                enabled = noteText.isNotBlank() && !isAddingNote,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (isAddingNote) {
+                        "Adding note..."
+                    } else {
+                        "Add note"
+                    }
+                )
+            }
+
+            if (noteError != null) {
+                Text(
+                    text = noteError,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

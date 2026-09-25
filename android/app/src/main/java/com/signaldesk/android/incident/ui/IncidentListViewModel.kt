@@ -21,6 +21,8 @@ data class IncidentListUiState(
     val timeline: List<IncidentTimelineEvent> = emptyList(),
     val isTimelineLoading: Boolean = false,
     val timelineError: String? = null,
+    val isAddingNote: Boolean = false,
+    val noteError: String? = null,
     val error: String? = null
 )
 
@@ -92,6 +94,51 @@ class IncidentListViewModel(
                     isTimelineLoading = false,
                     timelineError = exception.message
                         ?: "Unable to load incident timeline"
+                )
+            }
+        }
+    }
+
+    fun addIncidentNote(
+        incidentId: Long,
+        message: String
+    ) {
+        val trimmedMessage = message.trim()
+
+        if (trimmedMessage.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                noteError = "Note cannot be empty"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isAddingNote = true,
+                noteError = null
+            )
+
+            try {
+                withContext(Dispatchers.IO) {
+                    repository.addIncidentNote(
+                        incidentId = incidentId,
+                        message = trimmedMessage
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    isAddingNote = false,
+                    noteError = null
+                )
+
+                loadIncidentTimeline(
+                    incidentId = incidentId
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isAddingNote = false,
+                    noteError = exception.message
+                        ?: "Unable to add incident note"
                 )
             }
         }
