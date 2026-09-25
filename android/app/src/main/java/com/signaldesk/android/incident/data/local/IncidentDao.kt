@@ -41,6 +41,11 @@ interface IncidentDao {
         incidentId: Long
     ): IncidentEntity?
 
+    @Query("SELECT * FROM incidents WHERE id = :incidentId")
+    fun observeIncident(
+        incidentId: Long
+    ): Flow<IncidentEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsertIncidents(
         incidents: List<IncidentEntity>

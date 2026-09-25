@@ -5,6 +5,9 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
+import com.signaldesk.android.incident.data.ObservableIncidentDetailRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -385,8 +388,240 @@ class IncidentDetailViewModelTest {
                 viewModel.uiState.value.timeline
             )
         }
+
+    @Test
+    fun statusUpdateDoesNotManuallyReplaceObservedIncident() =
+        runTest(testDispatcher) {
+            val observedIncident = Incident(
+                id = 701,
+                title = "Observed incident",
+                description = "Owned by observable repository",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val mutationResult = observedIncident.copy(
+                status = IncidentStatus.RESOLVED
+            )
+
+            val repository = TestIncidentDetailRepository(
+                incident = observedIncident,
+                updatedIncident = mutationResult
+            )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = observedIncident
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncident(
+                incidentId = observedIncident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.updateIncidentStatus(
+                incidentId = observedIncident.id,
+                status = IncidentStatus.RESOLVED
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                observedIncident,
+                viewModel.uiState.value.incident
+            )
+
+            assertEquals(
+                observedIncident.id,
+                repository.updatedIncidentId
+            )
+
+            assertEquals(
+                IncidentStatus.RESOLVED,
+                repository.requestedStatus
+            )
+
+            assertFalse(
+                viewModel.uiState.value.isUpdating
+            )
+        }
+
+    @Test
+    fun observableIncidentUpdatesDetailState() =
+        runTest(testDispatcher) {
+            val initialIncident = Incident(
+                id = 601,
+                title = "Initial cached incident",
+                description = "First Room emission",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val updatedIncident = initialIncident.copy(
+                title = "Updated cached incident",
+                status = IncidentStatus.INVESTIGATING
+            )
+
+            val repository = TestIncidentDetailRepository(
+                incident = initialIncident
+            )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = initialIncident
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncident(
+                incidentId = initialIncident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                initialIncident,
+                viewModel.uiState.value.incident
+            )
+
+            observableRepository.emit(
+                updatedIncident
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                updatedIncident,
+                viewModel.uiState.value.incident
+            )
+        }
+
+    @Test
+    fun refreshFailureKeepsObservedIncident() =
+        runTest(testDispatcher) {
+            val observedIncident = Incident(
+                id = 501,
+                title = "Cached incident",
+                description = "Available from Room",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val repository = TestIncidentDetailRepository(
+                incident = observedIncident,
+                incidentLoadError =
+                    IllegalStateException("Incident unavailable")
+            )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = observedIncident
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncident(
+                incidentId = observedIncident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                observedIncident,
+                viewModel.uiState.value.incident
+            )
+
+            assertFalse(
+                viewModel.uiState.value.isLoading
+            )
+
+            assertEquals(
+                "Incident unavailable",
+                viewModel.uiState.value.error
+            )
+        }
+
+    @Test
+    fun observableIncidentOwnsDetailState() =
+        runTest(testDispatcher) {
+            val refreshIncident = Incident(
+                id = 301,
+                title = "Remote refresh result",
+                description = "Returned by getIncident",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val observedIncident = Incident(
+                id = 301,
+                title = "Room observed incident",
+                description = "Emitted by observable repository",
+                severity = Severity.CRITICAL,
+                status = IncidentStatus.INVESTIGATING
+            )
+
+            val repository = TestIncidentDetailRepository(
+                incident = refreshIncident
+            )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = observedIncident
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncident(
+                incidentId = refreshIncident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                observedIncident,
+                viewModel.uiState.value.incident
+            )
+        }
 }
 
+private class TestObservableIncidentDetailRepository(
+    incident: Incident?
+) : ObservableIncidentDetailRepository {
+
+    private val incidentState =
+        MutableStateFlow(incident)
+
+    override fun observeIncident(
+        incidentId: Long
+    ): Flow<Incident?> {
+        return incidentState
+    }
+
+    fun emit(
+        incident: Incident?
+    ) {
+        incidentState.value = incident
+    }
+}
 private class TestIncidentDetailRepository(
     private val incident: Incident,
     private val incidentLoadError: Exception? = null,

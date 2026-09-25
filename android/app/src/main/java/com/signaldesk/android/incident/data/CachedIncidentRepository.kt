@@ -15,7 +15,9 @@ import com.signaldesk.android.incident.data.local.toEntity
 class CachedIncidentRepository(
     private val remote: IncidentRepository,
     private val local: IncidentDao
-) : IncidentRepository, ObservableIncidentRepository {
+) : IncidentRepository,
+    ObservableIncidentRepository,
+    ObservableIncidentDetailRepository {
     override fun observeIncidents(
         status: IncidentStatus?,
         severity: Severity?
@@ -25,6 +27,16 @@ class CachedIncidentRepository(
             severity = severity?.name
         ).map { entities ->
             entities.map { it.toDomain() }
+        }
+    }
+
+    override fun observeIncident(
+        incidentId: Long
+    ): Flow<Incident?> {
+        return local.observeIncident(
+            incidentId = incidentId
+        ).map { entity ->
+            entity?.toDomain()
         }
     }
 

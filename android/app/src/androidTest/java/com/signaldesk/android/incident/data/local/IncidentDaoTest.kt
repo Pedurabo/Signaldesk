@@ -425,6 +425,60 @@ class IncidentDaoTest {
     }
 
     @Test
+    fun observedIncidentEmitsWhenDatabaseChanges() = runBlocking {
+        val emissions =
+            mutableListOf<IncidentEntity?>()
+
+        val initialEmissionReceived =
+            CompletableDeferred<Unit>()
+
+        val collectionJob =
+            launch(
+                start = CoroutineStart.UNDISPATCHED
+            ) {
+                dao.observeIncident(
+                    incidentId = 51
+                )
+                    .onEach { incident ->
+                        if (
+                            incident == null &&
+                            !initialEmissionReceived.isCompleted
+                        ) {
+                            initialEmissionReceived.complete(Unit)
+                        }
+                    }
+                    .take(2)
+                    .toList(emissions)
+            }
+
+        initialEmissionReceived.await()
+
+        dao.upsertIncident(
+            incident(
+                id = 51,
+                status = "INVESTIGATING"
+            )
+        )
+
+        collectionJob.join()
+
+        assertEquals(
+            null,
+            emissions[0]
+        )
+
+        assertEquals(
+            51L,
+            emissions[1]?.id
+        )
+
+        assertEquals(
+            "INVESTIGATING",
+            emissions[1]?.status
+        )
+    }
+
+    @Test
     fun observedIncidentsEmitWhenDatabaseChanges() = runBlocking {
         val emissions =
             mutableListOf<List<IncidentEntity>>()

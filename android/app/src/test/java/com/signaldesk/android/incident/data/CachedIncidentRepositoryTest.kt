@@ -23,6 +23,35 @@ import org.junit.Test
 class CachedIncidentRepositoryTest {
 
     @Test
+    fun observedIncidentComesFromLocalCache() = runBlocking {
+        val cachedIncident = incident(
+            id = 71,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                cachedIncident.toEntity()
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = local
+        )
+
+        val observedIncident =
+            repository.observeIncident(
+                incidentId = cachedIncident.id
+            ).first()
+
+        assertEquals(
+            cachedIncident,
+            observedIncident
+        )
+    }
+
+    @Test
     fun networkSuccessRefreshesCompleteLocalCache() {
         val remote = FakeRemoteRepository(
             incidents = listOf(
@@ -625,6 +654,16 @@ private class FakeIncidentDao(
         incidentId: Long
     ): IncidentEntity? {
         return incidents[incidentId]
+    }
+
+    override fun observeIncident(
+        incidentId: Long
+    ): Flow<IncidentEntity?> {
+        return incidentState.map { current ->
+            current.firstOrNull { incident ->
+                incident.id == incidentId
+            }
+        }
     }
 
     override fun upsertIncidents(
