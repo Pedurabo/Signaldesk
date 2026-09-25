@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   getIncident,
   getIncidentTimeline,
@@ -10,15 +11,11 @@ import type {
   IncidentEvent,
 } from '../types/incident'
 
-type IncidentDetailProps = {
-  incidentId: number
-  onBack: () => void
-}
+export function IncidentDetail() {
+  const navigate = useNavigate()
+  const { incidentId: incidentIdParam } = useParams()
 
-export function IncidentDetail({
-  incidentId,
-  onBack,
-}: IncidentDetailProps) {
+  const incidentId = Number(incidentIdParam)
   const [incident, setIncident] =
     useState<Incident | null>(null)
 
@@ -72,7 +69,7 @@ export function IncidentDetail({
         <button
           type="button"
           className="back-action"
-          onClick={onBack}
+          onClick={() => navigate("/")}
         >
           Back to incidents
         </button>
@@ -89,7 +86,7 @@ export function IncidentDetail({
       <button
         type="button"
         className="back-action"
-        onClick={onBack}
+        onClick={() => navigate("/")}
       >
         Back to incidents
       </button>
@@ -134,4 +131,5 @@ export function IncidentDetail({
     </main>
   )
 }
+
 

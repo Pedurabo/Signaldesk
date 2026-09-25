@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
+  Route,
+  Routes,
+  useNavigate,
+} from 'react-router-dom'
+import {
   createIncident,
   getIncidents,
   updateIncidentStatus,
@@ -15,10 +20,9 @@ import type {
 } from './types/incident'
 import './App.css'
 
-function App() {
+function Dashboard() {
+  const navigate = useNavigate()
   const [incidents, setIncidents] = useState<Incident[]>([])
-  const [selectedIncidentId, setSelectedIncidentId] =
-    useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -105,15 +109,6 @@ function App() {
   const criticalCount = incidents.filter(
     (incident) => incident.severity === 'CRITICAL'
   ).length
-
-  if (selectedIncidentId !== null) {
-    return (
-      <IncidentDetail
-        incidentId={selectedIncidentId}
-        onBack={() => setSelectedIncidentId(null)}
-      />
-    )
-  }
 
   return (
     <main className="dashboard">
@@ -229,7 +224,9 @@ function App() {
                 key={incident.id}
                 incident={incident}
                 onStatusChange={handleStatusChange}
-                onOpenDetails={setSelectedIncidentId}
+                onOpenDetails={(incidentId) =>
+                  navigate(`/incidents/${incidentId}`)
+                }
               />
             ))}
           </div>
@@ -239,5 +236,18 @@ function App() {
   )
 }
 
+function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route
+        path="/incidents/:incidentId"
+        element={<IncidentDetail />}
+      />
+    </Routes>
+  )
+}
+
 export default App
+
 
