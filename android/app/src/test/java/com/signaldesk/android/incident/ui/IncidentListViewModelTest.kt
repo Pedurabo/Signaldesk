@@ -5,6 +5,7 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -173,9 +174,94 @@ class IncidentListViewModelTest {
                 viewModel.uiState.value.isCreatingIncident
             )
         }
+
+    @Test
+    fun latestStatusFilterOwnsFinalIncidentState() =
+        runTest(testDispatcher) {
+            val openIncident = incident(
+                id = 201,
+                status = IncidentStatus.OPEN
+            )
+
+            val resolvedIncident = incident(
+                id = 202,
+                status = IncidentStatus.RESOLVED
+            )
+
+            val repository = TestIncidentRepository(
+                incidents = listOf(
+                    openIncident,
+                    resolvedIncident
+                )
+            )
+
+            val viewModel = IncidentListViewModel(
+                repository = repository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.setStatusFilter(
+                IncidentStatus.OPEN
+            )
+
+            viewModel.setStatusFilter(
+                IncidentStatus.RESOLVED
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                IncidentStatus.RESOLVED,
+                viewModel.uiState.value.selectedStatus
+            )
+
+            assertEquals(
+                listOf(resolvedIncident),
+                viewModel.uiState.value.incidents
+            )
+
+            assertEquals(
+                IncidentRequest(
+                    status = IncidentStatus.RESOLVED,
+                    severity = null
+                ),
+                repository.requests.last()
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.error
+            )
+        }
+
+    @Test
+    fun cancellationIsNotReportedAsLoadError() =
+        runTest(testDispatcher) {
+            val repository = TestIncidentRepository(
+                incidents = emptyList(),
+                loadError = CancellationException(
+                    "Cancelled stale load"
+                )
+            )
+
+            val viewModel = IncidentListViewModel(
+                repository = repository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.error
+            )
+        }
 }
 
 private data class IncidentRequest(
+
     val status: IncidentStatus?,
     val severity: Severity?
 )
