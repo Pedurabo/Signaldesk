@@ -8,8 +8,18 @@ import androidx.room.Query
 @Dao
 interface IncidentDao {
 
-    @Query("SELECT * FROM incidents ORDER BY id DESC")
-    fun getIncidents(): List<IncidentEntity>
+    @Query(
+        """
+        SELECT * FROM incidents
+        WHERE (:status IS NULL OR status = :status)
+          AND (:severity IS NULL OR severity = :severity)
+        ORDER BY id DESC
+        """
+    )
+    fun getIncidents(
+        status: String? = null,
+        severity: String? = null
+    ): List<IncidentEntity>
 
     @Query("SELECT * FROM incidents WHERE id = :incidentId")
     fun getIncident(incidentId: Long): IncidentEntity?

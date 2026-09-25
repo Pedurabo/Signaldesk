@@ -120,16 +120,107 @@ class IncidentDaoTest {
         )
     }
 
+    @Test
+    fun incidentsCanBeFilteredByStatus() {
+        dao.upsertIncidents(
+            listOf(
+                incident(
+                    id = 41,
+                    status = "OPEN"
+                ),
+                incident(
+                    id = 42,
+                    status = "INVESTIGATING"
+                ),
+                incident(
+                    id = 43,
+                    status = "OPEN"
+                )
+            )
+        )
+
+        val incidents =
+            dao.getIncidents(status = "OPEN")
+
+        assertEquals(
+            listOf(43L, 41L),
+            incidents.map { it.id }
+        )
+    }
+
+    @Test
+    fun incidentsCanBeFilteredBySeverity() {
+        dao.upsertIncidents(
+            listOf(
+                incident(
+                    id = 41,
+                    severity = "HIGH"
+                ),
+                incident(
+                    id = 42,
+                    severity = "CRITICAL"
+                ),
+                incident(
+                    id = 43,
+                    severity = "HIGH"
+                )
+            )
+        )
+
+        val incidents =
+            dao.getIncidents(severity = "CRITICAL")
+
+        assertEquals(
+            listOf(42L),
+            incidents.map { it.id }
+        )
+    }
+
+    @Test
+    fun incidentsCanBeFilteredByStatusAndSeverity() {
+        dao.upsertIncidents(
+            listOf(
+                incident(
+                    id = 41,
+                    status = "OPEN",
+                    severity = "HIGH"
+                ),
+                incident(
+                    id = 42,
+                    status = "OPEN",
+                    severity = "CRITICAL"
+                ),
+                incident(
+                    id = 43,
+                    status = "RESOLVED",
+                    severity = "CRITICAL"
+                )
+            )
+        )
+
+        val incidents =
+            dao.getIncidents(
+                status = "OPEN",
+                severity = "CRITICAL"
+            )
+
+        assertEquals(
+            listOf(42L),
+            incidents.map { it.id }
+        )
+    }
+
     private fun incident(
         id: Long,
         title: String = "Incident $id",
-        status: String = "OPEN"
+        status: String = "OPEN",
+        severity: String = "HIGH"
     ): IncidentEntity {
         return IncidentEntity(
             id = id,
             title = title,
             description = "Test description",
-            severity = "HIGH",
+            severity = severity,
             status = status
         )
     }
