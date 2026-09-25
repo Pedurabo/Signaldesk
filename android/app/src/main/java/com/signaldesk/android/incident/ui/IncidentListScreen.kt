@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -29,6 +27,7 @@ fun IncidentListScreen(
     incidents: List<Incident>,
     isLoading: Boolean,
     error: String?,
+    onIncidentClick: (Incident) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -86,7 +85,12 @@ fun IncidentListScreen(
                         items = incidents,
                         key = { incident -> incident.id }
                     ) { incident ->
-                        IncidentCard(incident)
+                        IncidentCard(
+                            incident = incident,
+                            onClick = {
+                                onIncidentClick(incident)
+                            }
+                        )
                     }
                 }
             }
@@ -103,11 +107,9 @@ private fun LoadingContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CircularProgressIndicator()
         Text(
             text = "Loading incidents...",
-            modifier = Modifier.padding(top = 16.dp),
-            style = MaterialTheme.typography.bodyLarge
+            style = MaterialTheme.typography.headlineSmall
         )
     }
 }
@@ -166,9 +168,11 @@ private fun EmptyContent(
 @Composable
 private fun IncidentCard(
     incident: Incident,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
