@@ -1,0 +1,33 @@
+# =========================
+# SignalDesk
+# =========================
+
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backend / Gradle
+backend/.gradle/
+backend/build/
+backend/out/
+
+# Frontend / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Logs
+*.log
+logs/
