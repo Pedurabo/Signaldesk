@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   createIncident,
   getIncidents,
+  updateIncidentStatus,
   type CreateIncidentRequest,
 } from './api/incidents'
 import { IncidentCard } from './components/IncidentCard'
 import { NewIncidentForm } from './components/NewIncidentForm'
-import type { Incident } from './types/incident'
+import type { Incident, IncidentStatus } from './types/incident'
 import './App.css'
 
 function App() {
@@ -32,6 +33,23 @@ function App() {
     ])
   }
 
+  async function handleStatusChange(
+    incidentId: number,
+    status: IncidentStatus
+  ) {
+    const updatedIncident = await updateIncidentStatus(
+      incidentId,
+      status
+    )
+
+    setIncidents((currentIncidents) =>
+      currentIncidents.map((incident) =>
+        incident.id === updatedIncident.id
+          ? updatedIncident
+          : incident
+      )
+    )
+  }
   const openCount = incidents.filter(
     (incident) => incident.status === 'OPEN'
   ).length
@@ -116,6 +134,7 @@ function App() {
               <IncidentCard
                 key={incident.id}
                 incident={incident}
+                onStatusChange={handleStatusChange}
               />
             ))}
           </div>
@@ -126,3 +145,4 @@ function App() {
 }
 
 export default App
+
