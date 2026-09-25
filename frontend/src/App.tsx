@@ -7,7 +7,11 @@ import {
 } from './api/incidents'
 import { IncidentCard } from './components/IncidentCard'
 import { NewIncidentForm } from './components/NewIncidentForm'
-import type { Incident, IncidentStatus } from './types/incident'
+import type {
+  Incident,
+  IncidentStatus,
+  Severity,
+} from './types/incident'
 import './App.css'
 
 function App() {
@@ -15,22 +19,44 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const [statusFilter, setStatusFilter] =
+    useState<IncidentStatus | ''>('')
+
+  const [severityFilter, setSeverityFilter] =
+    useState<Severity | ''>('')
+
   useEffect(() => {
-    getIncidents()
+    setLoading(true)
+    setError(null)
+
+    getIncidents({
+      status: statusFilter || undefined,
+      severity: severityFilter || undefined,
+    })
       .then(setIncidents)
       .catch((error: Error) => setError(error.message))
       .finally(() => setLoading(false))
-  }, [])
+  }, [statusFilter, severityFilter])
 
   async function handleCreateIncident(
     request: CreateIncidentRequest
   ) {
     const createdIncident = await createIncident(request)
 
-    setIncidents((currentIncidents) => [
-      createdIncident,
-      ...currentIncidents,
-    ])
+    const matchesStatus =
+      !statusFilter ||
+      createdIncident.status === statusFilter
+
+    const matchesSeverity =
+      !severityFilter ||
+      createdIncident.severity === severityFilter
+
+    if (matchesStatus && matchesSeverity) {
+      setIncidents((currentIncidents) => [
+        createdIncident,
+        ...currentIncidents,
+      ])
+    }
   }
 
   async function handleStatusChange(
@@ -42,14 +68,29 @@ function App() {
       status
     )
 
-    setIncidents((currentIncidents) =>
-      currentIncidents.map((incident) =>
+    const matchesStatus =
+      !statusFilter ||
+      updatedIncident.status === statusFilter
+
+    const matchesSeverity =
+      !severityFilter ||
+      updatedIncident.severity === severityFilter
+
+    setIncidents((currentIncidents) => {
+      if (!matchesStatus || !matchesSeverity) {
+        return currentIncidents.filter(
+          (incident) => incident.id !== updatedIncident.id
+        )
+      }
+
+      return currentIncidents.map((incident) =>
         incident.id === updatedIncident.id
           ? updatedIncident
           : incident
       )
-    )
+    })
   }
+
   const openCount = incidents.filter(
     (incident) => incident.status === 'OPEN'
   ).length
@@ -76,7 +117,7 @@ function App() {
 
       <section className="summary-grid">
         <div className="summary-card">
-          <span>Total incidents</span>
+          <span>Visible incidents</span>
           <strong>{incidents.length}</strong>
         </div>
 
@@ -106,8 +147,49 @@ function App() {
           </div>
 
           <span className="incident-count">
-            {incidents.length} total
+            {incidents.length} visible
           </span>
+        </div>
+
+        <div className="filter-bar">
+          <label>
+            Status
+
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(
+                  event.target.value as IncidentStatus | ''
+                )
+              }
+            >
+              <option value="">All statuses</option>
+              <option value="OPEN">Open</option>
+              <option value="INVESTIGATING">
+                Investigating
+              </option>
+              <option value="RESOLVED">Resolved</option>
+            </select>
+          </label>
+
+          <label>
+            Severity
+
+            <select
+              value={severityFilter}
+              onChange={(event) =>
+                setSeverityFilter(
+                  event.target.value as Severity | ''
+                )
+              }
+            >
+              <option value="">All severities</option>
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+          </label>
         </div>
 
         {loading && (
@@ -124,7 +206,7 @@ function App() {
 
         {!loading && !error && incidents.length === 0 && (
           <p className="state-message">
-            No incidents found.
+            No incidents match these filters.
           </p>
         )}
 
@@ -145,4 +227,3 @@ function App() {
 }
 
 export default App
-

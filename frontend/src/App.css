@@ -423,3 +423,37 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  background: #111827;
+}
+
+.filter-bar label {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.filter-bar select {
+  padding: 9px 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  outline: none;
+  background: #0f172a;
+  color: #e5e7eb;
+  font: inherit;
+}
+
+.filter-bar select:focus {
+  border-color: #60a5fa;
+}

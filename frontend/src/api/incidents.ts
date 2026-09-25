@@ -13,8 +13,31 @@ export type CreateIncidentRequest = {
   severity: Severity
 }
 
-export async function getIncidents(): Promise<Incident[]> {
-  const response = await fetch(API_URL)
+export type IncidentFilters = {
+  status?: IncidentStatus
+  severity?: Severity
+}
+
+export async function getIncidents(
+  filters: IncidentFilters = {}
+): Promise<Incident[]> {
+  const params = new URLSearchParams()
+
+  if (filters.status) {
+    params.set('status', filters.status)
+  }
+
+  if (filters.severity) {
+    params.set('severity', filters.severity)
+  }
+
+  const query = params.toString()
+
+  const url = query
+    ? `${API_URL}?${query}`
+    : API_URL
+
+  const response = await fetch(url)
 
   if (!response.ok) {
     throw new Error(`Failed to load incidents: HTTP ${response.status}`)
@@ -105,3 +128,4 @@ export async function addIncidentNote(
 
   return response.json()
 }
+
