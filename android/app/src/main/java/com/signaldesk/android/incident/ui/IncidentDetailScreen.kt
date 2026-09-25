@@ -12,6 +12,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -29,12 +30,20 @@ fun IncidentDetailScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    TextButton(
+                        onClick = onBack
+                    ) {
+                        Text("Back")
+                    }
+                },
                 title = {
                     Text("Incident #${incident.id}")
                 }
             )
         }
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -42,12 +51,6 @@ fun IncidentDetailScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Button(
-                onClick = onBack
-            ) {
-                Text("Back to incidents")
-            }
-
             Text(
                 text = incident.title,
                 style = MaterialTheme.typography.headlineSmall
@@ -115,10 +118,31 @@ fun IncidentDetailScreen(
                 }
             }
 
-            Text(
-                text = "Incident #${incident.id}",
-                style = MaterialTheme.typography.bodySmall
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Incident ID",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+
+                    Text(
+                        text = "#${incident.id}",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            }
+
+            Button(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Back to incidents")
+            }
         }
     }
 }
