@@ -4,6 +4,13 @@
     alias(libs.plugins.google.ksp)
 }
 
+ksp {
+    arg(
+        "room.schemaLocation",
+        "$projectDir/schemas"
+    )
+}
+
 android {
     namespace = "com.signaldesk.android"
     compileSdk {
@@ -38,7 +45,9 @@ android {
     buildFeatures {
         compose = true
     }
+
 }
+
 
 dependencies {
     implementation(libs.androidx.core.ktx)

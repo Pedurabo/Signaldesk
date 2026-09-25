@@ -23,13 +23,19 @@ interface IncidentDao {
     ): List<IncidentEntity>
 
     @Query("SELECT * FROM incidents WHERE id = :incidentId")
-    fun getIncident(incidentId: Long): IncidentEntity?
+    fun getIncident(
+        incidentId: Long
+    ): IncidentEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsertIncidents(incidents: List<IncidentEntity>)
+    fun upsertIncidents(
+        incidents: List<IncidentEntity>
+    )
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun upsertIncident(incident: IncidentEntity)
+    fun upsertIncident(
+        incident: IncidentEntity
+    )
 
     @Query("DELETE FROM incidents")
     fun deleteAllIncidents()
@@ -40,5 +46,40 @@ interface IncidentDao {
     ) {
         deleteAllIncidents()
         upsertIncidents(incidents)
+    }
+
+    @Query(
+        """
+        SELECT * FROM incident_timeline_events
+        WHERE incidentId = :incidentId
+        ORDER BY id ASC
+        """
+    )
+    fun getTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEventEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun upsertTimelineEvents(
+        events: List<IncidentTimelineEventEntity>
+    )
+
+    @Query(
+        """
+        DELETE FROM incident_timeline_events
+        WHERE incidentId = :incidentId
+        """
+    )
+    fun deleteTimelineForIncident(
+        incidentId: Long
+    )
+
+    @Transaction
+    fun replaceTimelineForIncident(
+        incidentId: Long,
+        events: List<IncidentTimelineEventEntity>
+    ) {
+        deleteTimelineForIncident(incidentId)
+        upsertTimelineEvents(events)
     }
 }

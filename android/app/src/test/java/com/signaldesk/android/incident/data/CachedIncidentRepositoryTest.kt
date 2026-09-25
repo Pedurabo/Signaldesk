@@ -9,6 +9,7 @@ import com.signaldesk.android.incident.IncidentTimelineEventType
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.local.IncidentDao
 import com.signaldesk.android.incident.data.local.IncidentEntity
+import com.signaldesk.android.incident.data.local.IncidentTimelineEventEntity
 import com.signaldesk.android.incident.data.local.toEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -364,6 +365,169 @@ class CachedIncidentRepositoryTest {
             status = status
         )
     }
+
+    @Test
+    fun timelineSuccessReplacesLocalTimeline() {
+        val local = FakeIncidentDao()
+
+        local.upsertTimelineEvents(
+            listOf(
+                IncidentTimelineEventEntity(
+                    id = 1,
+                    incidentId = 41,
+                    type = "CREATED",
+                    message = "Stale event",
+                    createdAt = "old"
+                )
+            )
+        )
+
+        val remoteTimeline = listOf(
+            IncidentTimelineEvent(
+                id = 2,
+                type = IncidentTimelineEventType.STATUS_CHANGED,
+                message = "Fresh event",
+                createdAt = "new"
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                timelineEvents = remoteTimeline
+            ),
+            local = local
+        )
+
+        val result =
+            repository.getIncidentTimeline(41)
+
+        assertEquals(remoteTimeline, result)
+
+        assertEquals(
+            listOf(2L),
+            local.getTimeline(41).map { it.id }
+        )
+    }
+
+    @Test
+    fun timelineFailureReturnsExistingLocalTimeline() {
+        val local = FakeIncidentDao()
+
+        local.upsertTimelineEvents(
+            listOf(
+                IncidentTimelineEventEntity(
+                    id = 7,
+                    incidentId = 41,
+                    type = "CREATED",
+                    message = "Cached event",
+                    createdAt = "cached"
+                )
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                timelineLoadError =
+                    IllegalStateException("offline")
+            ),
+            local = local
+        )
+
+        val result =
+            repository.getIncidentTimeline(41)
+
+        assertEquals(
+            listOf(7L),
+            result.map { it.id }
+        )
+
+        assertEquals(
+            "Cached event",
+            result.single().message
+        )
+    }
+
+    @Test
+    fun timelineFailureRethrowsRemoteErrorWhenCacheIsMissing() {
+        val remoteError =
+            IllegalStateException("offline")
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                timelineLoadError = remoteError
+            ),
+            local = FakeIncidentDao()
+        )
+
+        val thrown =
+            assertThrows(
+                IllegalStateException::class.java
+            ) {
+                repository.getIncidentTimeline(41)
+            }
+
+        assertEquals(
+            remoteError,
+            thrown
+        )
+    }
+    @Test
+    fun timelineCancellationIsNotConvertedToCacheFallback() {
+        val local = FakeIncidentDao()
+
+        local.upsertTimelineEvents(
+            listOf(
+                IncidentTimelineEventEntity(
+                    id = 7,
+                    incidentId = 41,
+                    type = "CREATED",
+                    message = "Cached event",
+                    createdAt = "cached"
+                )
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                timelineLoadError =
+                    CancellationException("cancelled")
+            ),
+            local = local
+        )
+
+        assertThrows(
+            CancellationException::class.java
+        ) {
+            repository.getIncidentTimeline(41)
+        }
+    }
+
+    @Test
+    fun addedNoteIsWrittenToLocalTimelineCache() {
+        val local = FakeIncidentDao()
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = local
+        )
+
+        val event =
+            repository.addIncidentNote(
+                incidentId = 41,
+                message = "Investigating logs"
+            )
+
+        assertEquals(
+            event.id,
+            local.getTimeline(41).single().id
+        )
+
+        assertEquals(
+            "Investigating logs",
+            local.getTimeline(41).single().message
+        )
+    }
+
 }
 
 private class FakeIncidentDao(
@@ -415,6 +579,33 @@ private class FakeIncidentDao(
         incidents.clear()
     }
 
+    private val timelineEvents =
+        mutableMapOf<Long, IncidentTimelineEventEntity>()
+
+    override fun getTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEventEntity> {
+        return timelineEvents.values
+            .filter { it.incidentId == incidentId }
+            .sortedBy { it.id }
+    }
+
+    override fun upsertTimelineEvents(
+        events: List<IncidentTimelineEventEntity>
+    ) {
+        events.forEach { event ->
+            timelineEvents[event.id] = event
+        }
+    }
+
+    override fun deleteTimelineForIncident(
+        incidentId: Long
+    ) {
+        timelineEvents.entries.removeAll {
+            it.value.incidentId == incidentId
+        }
+    }
+
     override fun replaceIncidents(
         incidents: List<IncidentEntity>
     ) {
@@ -427,7 +618,9 @@ private class FakeRemoteRepository(
     private val incidents: List<Incident> = emptyList(),
     private val loadError: Exception? = null,
     private val incidentLoadError: Exception? = null,
-    private val updatedIncident: Incident? = null
+    private val updatedIncident: Incident? = null,
+    private val timelineEvents: List<IncidentTimelineEvent> = emptyList(),
+    private val timelineLoadError: Exception? = null
 ) : IncidentRepository {
 
     var requestedStatus: IncidentStatus? = null
@@ -474,7 +667,11 @@ private class FakeRemoteRepository(
     override fun getIncidentTimeline(
         incidentId: Long
     ): List<IncidentTimelineEvent> {
-        return emptyList()
+        timelineLoadError?.let {
+            throw it
+        }
+
+        return timelineEvents
     }
 
     override fun addIncidentNote(

@@ -84,17 +84,51 @@ class CachedIncidentRepository(
     override fun getIncidentTimeline(
         incidentId: Long
     ): List<IncidentTimelineEvent> {
-        return remote.getIncidentTimeline(incidentId)
+        return try {
+            val events =
+                remote.getIncidentTimeline(incidentId)
+
+            local.replaceTimelineForIncident(
+                incidentId = incidentId,
+                events = events.map {
+                    it.toEntity(incidentId)
+                }
+            )
+
+            events
+        } catch (error: Exception) {
+            if (error is CancellationException) {
+                throw error
+            }
+
+            val cachedEvents =
+                local.getTimeline(incidentId)
+
+            if (cachedEvents.isEmpty()) {
+                throw error
+            }
+
+            cachedEvents.map { it.toDomain() }
+        }
     }
 
     override fun addIncidentNote(
         incidentId: Long,
         message: String
     ): IncidentTimelineEvent {
-        return remote.addIncidentNote(
-            incidentId = incidentId,
-            message = message
+        val event =
+            remote.addIncidentNote(
+                incidentId = incidentId,
+                message = message
+            )
+
+        local.upsertTimelineEvents(
+            listOf(
+                event.toEntity(incidentId)
+            )
         )
+
+        return event
     }
 
     override fun updateIncidentStatus(

@@ -265,4 +265,154 @@ class IncidentDaoTest {
             status = status
         )
     }
+
+    @Test
+    fun timelineEventsCanBeLoadedForIncident() {
+        dao.upsertTimelineEvents(
+            listOf(
+                timelineEvent(
+                    id = 1,
+                    incidentId = 41,
+                    message = "Incident created"
+                ),
+                timelineEvent(
+                    id = 2,
+                    incidentId = 42,
+                    message = "Other incident created"
+                ),
+                timelineEvent(
+                    id = 3,
+                    incidentId = 41,
+                    message = "Investigation started"
+                )
+            )
+        )
+
+        val events = dao.getTimeline(41)
+
+        assertEquals(
+            listOf(1L, 3L),
+            events.map { it.id }
+        )
+    }
+
+    @Test
+    fun replacingTimelineRemovesStaleEventsForIncident() {
+        dao.upsertTimelineEvents(
+            listOf(
+                timelineEvent(
+                    id = 1,
+                    incidentId = 41,
+                    message = "Old event"
+                ),
+                timelineEvent(
+                    id = 2,
+                    incidentId = 41,
+                    message = "Also old"
+                )
+            )
+        )
+
+        dao.replaceTimelineForIncident(
+            incidentId = 41,
+            events = listOf(
+                timelineEvent(
+                    id = 3,
+                    incidentId = 41,
+                    message = "Fresh event"
+                )
+            )
+        )
+
+        assertEquals(
+            listOf(3L),
+            dao.getTimeline(41).map { it.id }
+        )
+    }
+
+    @Test
+    fun replacingTimelinePreservesOtherIncidentTimeline() {
+        dao.upsertTimelineEvents(
+            listOf(
+                timelineEvent(
+                    id = 1,
+                    incidentId = 41,
+                    message = "Incident 41 old event"
+                ),
+                timelineEvent(
+                    id = 2,
+                    incidentId = 42,
+                    message = "Incident 42 event"
+                )
+            )
+        )
+
+        dao.replaceTimelineForIncident(
+            incidentId = 41,
+            events = listOf(
+                timelineEvent(
+                    id = 3,
+                    incidentId = 41,
+                    message = "Incident 41 fresh event"
+                )
+            )
+        )
+
+        assertEquals(
+            listOf(3L),
+            dao.getTimeline(41).map { it.id }
+        )
+
+        assertEquals(
+            listOf(2L),
+            dao.getTimeline(42).map { it.id }
+        )
+    }
+
+    @Test
+    fun replacingTimelineWithEmptyListClearsOnlyRequestedIncident() {
+        dao.upsertTimelineEvents(
+            listOf(
+                timelineEvent(
+                    id = 1,
+                    incidentId = 41,
+                    message = "Incident 41 event"
+                ),
+                timelineEvent(
+                    id = 2,
+                    incidentId = 42,
+                    message = "Incident 42 event"
+                )
+            )
+        )
+
+        dao.replaceTimelineForIncident(
+            incidentId = 41,
+            events = emptyList()
+        )
+
+        assertEquals(
+            emptyList<Long>(),
+            dao.getTimeline(41).map { it.id }
+        )
+
+        assertEquals(
+            listOf(2L),
+            dao.getTimeline(42).map { it.id }
+        )
+    }
+
+    private fun timelineEvent(
+        id: Long,
+        incidentId: Long,
+        message: String
+    ): IncidentTimelineEventEntity {
+        return IncidentTimelineEventEntity(
+            id = id,
+            incidentId = incidentId,
+            type = "CREATED",
+            message = message,
+            createdAt = "2026-09-25T12:00:00Z"
+        )
+    }
 }

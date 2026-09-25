@@ -22,7 +22,11 @@ class MainActivity : ComponentActivity() {
             applicationContext,
             SignalDeskDatabase::class.java,
             "signaldesk.db"
-        ).build()
+        )
+            .addMigrations(
+                SignalDeskDatabase.MIGRATION_1_2
+            )
+            .build()
     }
 
     private val repository by lazy {
