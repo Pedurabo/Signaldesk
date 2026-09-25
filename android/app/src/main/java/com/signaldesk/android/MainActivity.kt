@@ -5,11 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
+import com.signaldesk.android.incident.ui.CreateIncidentScreen
 import com.signaldesk.android.incident.ui.IncidentDetailScreen
 import com.signaldesk.android.incident.ui.IncidentListScreen
 import com.signaldesk.android.incident.ui.IncidentListViewModel
@@ -36,11 +39,45 @@ class MainActivity : ComponentActivity() {
 
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+                var isCreatingIncident by remember {
+                    mutableStateOf(false)
+                }
+
+                LaunchedEffect(uiState.createdIncidentId) {
+                    val createdIncidentId = uiState.createdIncidentId
+
+                    if (createdIncidentId != null) {
+                        isCreatingIncident = false
+                        selectedIncidentId = createdIncidentId
+
+                        viewModel.loadIncidentTimeline(
+                            incidentId = createdIncidentId
+                        )
+
+                        viewModel.clearCreatedIncident()
+                    }
+                }
+
                 val incident = selectedIncidentId?.let { incidentId ->
                     uiState.incidents.firstOrNull { it.id == incidentId }
                 }
 
-                if (selectedIncidentId == null) {
+                if (isCreatingIncident) {
+                    CreateIncidentScreen(
+                        isCreating = uiState.isCreatingIncident,
+                        error = uiState.createIncidentError,
+                        onCreateIncident = { title, description, severity ->
+                            viewModel.createIncident(
+                                title = title,
+                                description = description,
+                                severity = severity
+                            )
+                        },
+                        onBack = {
+                            isCreatingIncident = false
+                        }
+                    )
+                } else if (selectedIncidentId == null) {
                     IncidentListScreen(
                         incidents = uiState.incidents,
                         isLoading = uiState.isLoading,
@@ -51,6 +88,9 @@ class MainActivity : ComponentActivity() {
                             viewModel.loadIncidentTimeline(
                                 incidentId = clickedIncident.id
                             )
+                        },
+                        onCreateIncidentClick = {
+                            isCreatingIncident = true
                         }
                     )
                 } else if (incident != null) {

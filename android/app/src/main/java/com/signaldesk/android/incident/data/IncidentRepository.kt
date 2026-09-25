@@ -9,6 +9,12 @@ interface IncidentRepository {
 
     fun getIncidents(): List<Incident>
 
+    fun createIncident(
+        title: String,
+        description: String,
+        severity: Severity
+    ): Incident
+
     fun getIncidentTimeline(
         incidentId: Long
     ): List<IncidentTimelineEvent>
@@ -70,6 +76,26 @@ class FakeIncidentRepository : IncidentRepository {
             message = message,
             createdAt = ""
         )
+    }
+
+    override fun createIncident(
+        title: String,
+        description: String,
+        severity: Severity
+    ): Incident {
+        val nextId = (incidents.maxOfOrNull { it.id } ?: 0L) + 1L
+
+        val incident = Incident(
+            id = nextId,
+            title = title,
+            description = description,
+            severity = severity,
+            status = IncidentStatus.OPEN
+        )
+
+        incidents.add(incident)
+
+        return incident
     }
 
     override fun updateIncidentStatus(

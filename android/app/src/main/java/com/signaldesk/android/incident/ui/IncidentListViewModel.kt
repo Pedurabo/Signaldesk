@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
+import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
@@ -17,6 +18,9 @@ import kotlinx.coroutines.withContext
 data class IncidentListUiState(
     val incidents: List<Incident> = emptyList(),
     val isLoading: Boolean = false,
+    val isCreatingIncident: Boolean = false,
+    val createIncidentError: String? = null,
+    val createdIncidentId: Long? = null,
     val updatingIncidentId: Long? = null,
     val timeline: List<IncidentTimelineEvent> = emptyList(),
     val isTimelineLoading: Boolean = false,
@@ -64,6 +68,70 @@ class IncidentListViewModel(
                 )
             }
         }
+    }
+
+    fun createIncident(
+        title: String,
+        description: String,
+        severity: Severity
+    ) {
+        val trimmedTitle = title.trim()
+        val trimmedDescription = description.trim()
+
+        if (trimmedTitle.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                createIncidentError = "Title cannot be empty"
+            )
+            return
+        }
+
+        if (trimmedDescription.isEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                createIncidentError = "Description cannot be empty"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isCreatingIncident = true,
+                createIncidentError = null,
+                createdIncidentId = null
+            )
+
+            try {
+                val createdIncident = withContext(Dispatchers.IO) {
+                    repository.createIncident(
+                        title = trimmedTitle,
+                        description = trimmedDescription,
+                        severity = severity
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    incidents = listOf(createdIncident) +
+                        _uiState.value.incidents.filterNot {
+                            it.id == createdIncident.id
+                        },
+                    isCreatingIncident = false,
+                    createIncidentError = null,
+                    createdIncidentId = createdIncident.id
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isCreatingIncident = false,
+                    createIncidentError = exception.message
+                        ?: "Unable to create incident",
+                    createdIncidentId = null
+                )
+            }
+        }
+    }
+
+    fun clearCreatedIncident() {
+        _uiState.value = _uiState.value.copy(
+            createdIncidentId = null
+        )
     }
 
     fun loadIncidentTimeline(

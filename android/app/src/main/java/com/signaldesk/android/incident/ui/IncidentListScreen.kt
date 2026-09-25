@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ fun IncidentListScreen(
     isLoading: Boolean,
     error: String?,
     onIncidentClick: (Incident) -> Unit,
+    onCreateIncidentClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -41,6 +43,13 @@ fun IncidentListScreen(
                             text = "Incident monitoring and response",
                             style = MaterialTheme.typography.bodySmall
                         )
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = onCreateIncidentClick
+                    ) {
+                        Text("Create")
                     }
                 }
             )

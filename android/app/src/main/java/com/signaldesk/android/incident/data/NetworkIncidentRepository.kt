@@ -67,6 +67,56 @@ class NetworkIncidentRepository(
         }
     }
 
+    override fun createIncident(
+        title: String,
+        description: String,
+        severity: Severity
+    ): Incident {
+        val connection =
+            URL("$baseUrl/api/incidents")
+                .openConnection() as HttpURLConnection
+
+        return try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+            connection.doOutput = true
+
+            connection.setRequestProperty(
+                "Content-Type",
+                "application/json"
+            )
+
+            val requestBody = JSONObject()
+                .put("title", title)
+                .put("description", description)
+                .put("severity", severity.name)
+                .toString()
+
+            connection.outputStream
+                .bufferedWriter()
+                .use { writer ->
+                    writer.write(requestBody)
+                }
+
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException(
+                    "Failed to create incident: HTTP ${connection.responseCode}"
+                )
+            }
+
+            val response = connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+            parseIncident(
+                JSONObject(response)
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     override fun addIncidentNote(
         incidentId: Long,
         message: String
