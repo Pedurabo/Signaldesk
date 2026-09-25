@@ -1,0 +1,60 @@
+package com.signaldesk.android.incident.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.signaldesk.android.incident.Incident
+import com.signaldesk.android.incident.data.IncidentRepository
+import com.signaldesk.android.incident.data.NetworkIncidentRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+data class IncidentListUiState(
+    val incidents: List<Incident> = emptyList(),
+    val isLoading: Boolean = false,
+    val error: String? = null
+)
+
+class IncidentListViewModel(
+    private val repository: IncidentRepository = NetworkIncidentRepository()
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(
+        IncidentListUiState(isLoading = true)
+    )
+
+    val uiState: StateFlow<IncidentListUiState> =
+        _uiState.asStateFlow()
+
+    init {
+        loadIncidents()
+    }
+
+    private fun loadIncidents() {
+        viewModelScope.launch {
+            _uiState.value = IncidentListUiState(
+                isLoading = true
+            )
+
+            try {
+                val incidents = withContext(Dispatchers.IO) {
+                    repository.getIncidents()
+                }
+
+                _uiState.value = IncidentListUiState(
+                    incidents = incidents,
+                    isLoading = false
+                )
+            } catch (exception: Exception) {
+                _uiState.value = IncidentListUiState(
+                    incidents = emptyList(),
+                    isLoading = false,
+                    error = exception.message ?: "Unable to load incidents"
+                )
+            }
+        }
+    }
+}
