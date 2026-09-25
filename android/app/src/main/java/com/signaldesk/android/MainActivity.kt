@@ -47,11 +47,18 @@ class MainActivity : ComponentActivity() {
                         error = uiState.error,
                         onIncidentClick = { clickedIncident ->
                             selectedIncidentId = clickedIncident.id
+
+                            viewModel.loadIncidentTimeline(
+                                incidentId = clickedIncident.id
+                            )
                         }
                     )
                 } else if (incident != null) {
                     IncidentDetailScreen(
                         incident = incident,
+                        timeline = uiState.timeline,
+                        isTimelineLoading = uiState.isTimelineLoading,
+                        timelineError = uiState.timelineError,
                         isUpdating = uiState.updatingIncidentId == incident.id,
                         error = uiState.error,
                         onStatusChange = { newStatus ->

@@ -2,11 +2,16 @@ package com.signaldesk.android.incident.data
 
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
+import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.Severity
 
 interface IncidentRepository {
 
     fun getIncidents(): List<Incident>
+
+    fun getIncidentTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEvent>
 
     fun updateIncidentStatus(
         incidentId: Long,
@@ -42,6 +47,12 @@ class FakeIncidentRepository : IncidentRepository {
 
     override fun getIncidents(): List<Incident> {
         return incidents.toList()
+    }
+
+    override fun getIncidentTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEvent> {
+        return emptyList()
     }
 
     override fun updateIncidentStatus(

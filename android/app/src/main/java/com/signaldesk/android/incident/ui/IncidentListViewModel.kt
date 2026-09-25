@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
+import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,9 @@ data class IncidentListUiState(
     val incidents: List<Incident> = emptyList(),
     val isLoading: Boolean = false,
     val updatingIncidentId: Long? = null,
+    val timeline: List<IncidentTimelineEvent> = emptyList(),
+    val isTimelineLoading: Boolean = false,
+    val timelineError: String? = null,
     val error: String? = null
 )
 
@@ -60,6 +64,39 @@ class IncidentListViewModel(
         }
     }
 
+    fun loadIncidentTimeline(
+        incidentId: Long
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                timeline = emptyList(),
+                isTimelineLoading = true,
+                timelineError = null
+            )
+
+            try {
+                val timeline = withContext(Dispatchers.IO) {
+                    repository.getIncidentTimeline(
+                        incidentId = incidentId
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    timeline = timeline,
+                    isTimelineLoading = false,
+                    timelineError = null
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    timeline = emptyList(),
+                    isTimelineLoading = false,
+                    timelineError = exception.message
+                        ?: "Unable to load incident timeline"
+                )
+            }
+        }
+    }
+
     fun updateIncidentStatus(
         incidentId: Long,
         status: IncidentStatus
@@ -89,6 +126,10 @@ class IncidentListViewModel(
                         }
                     },
                     updatingIncidentId = null
+                )
+
+                loadIncidentTimeline(
+                    incidentId = incidentId
                 )
             } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(

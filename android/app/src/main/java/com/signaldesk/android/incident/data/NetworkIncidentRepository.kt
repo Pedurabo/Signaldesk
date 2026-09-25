@@ -2,6 +2,8 @@ package com.signaldesk.android.incident.data
 
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
+import com.signaldesk.android.incident.IncidentTimelineEvent
+import com.signaldesk.android.incident.IncidentTimelineEventType
 import com.signaldesk.android.incident.Severity
 import org.json.JSONArray
 import org.json.JSONObject
@@ -32,6 +34,34 @@ class NetworkIncidentRepository(
                 .use { it.readText() }
 
             parseIncidents(response)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    override fun getIncidentTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEvent> {
+        val connection =
+            URL("$baseUrl/api/incidents/$incidentId/timeline")
+                .openConnection() as HttpURLConnection
+
+        return try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException(
+                    "Failed to load incident timeline: HTTP ${connection.responseCode}"
+                )
+            }
+
+            val response = connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+            parseTimeline(response)
         } finally {
             connection.disconnect()
         }
@@ -112,5 +142,28 @@ class NetworkIncidentRepository(
                 item.getString("status")
             )
         )
+    }
+
+    private fun parseTimeline(
+        json: String
+    ): List<IncidentTimelineEvent> {
+        val array = JSONArray(json)
+
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+
+                add(
+                    IncidentTimelineEvent(
+                        id = item.getLong("id"),
+                        type = IncidentTimelineEventType.valueOf(
+                            item.getString("type")
+                        ),
+                        message = item.getString("message"),
+                        createdAt = item.getString("createdAt")
+                    )
+                )
+            }
+        }
     }
 }

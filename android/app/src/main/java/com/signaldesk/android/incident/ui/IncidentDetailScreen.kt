@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,11 +21,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
+import com.signaldesk.android.incident.IncidentTimelineEvent
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncidentDetailScreen(
     incident: Incident,
+    timeline: List<IncidentTimelineEvent>,
+    isTimelineLoading: Boolean,
+    timelineError: String?,
     isUpdating: Boolean,
     error: String?,
     onStatusChange: (IncidentStatus) -> Unit,
@@ -52,6 +58,7 @@ fun IncidentDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -122,25 +129,6 @@ fun IncidentDetailScreen(
                 }
             }
 
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Incident ID",
-                        style = MaterialTheme.typography.labelMedium
-                    )
-
-                    Text(
-                        text = "#${incident.id}",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-
             when (incident.status) {
                 IncidentStatus.OPEN -> {
                     Button(
@@ -197,12 +185,78 @@ fun IncidentDetailScreen(
                 )
             }
 
+            Text(
+                text = "Timeline",
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            when {
+                isTimelineLoading -> {
+                    Text(
+                        text = "Loading timeline...",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                timelineError != null -> {
+                    Text(
+                        text = timelineError,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                timeline.isEmpty() -> {
+                    Text(
+                        text = "No timeline events.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                else -> {
+                    timeline.forEach { event ->
+                        TimelineEventCard(
+                            event = event
+                        )
+                    }
+                }
+            }
+
             TextButton(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Back to incidents")
             }
+        }
+    }
+}
+
+@Composable
+private fun TimelineEventCard(
+    event: IncidentTimelineEvent,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = event.type.name.replace("_", " "),
+                style = MaterialTheme.typography.labelLarge
+            )
+
+            Text(
+                text = event.message,
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            Text(
+                text = event.createdAt,
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
