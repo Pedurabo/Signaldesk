@@ -1,5 +1,7 @@
 package com.signaldesk.android.incident.data
 
+import kotlinx.coroutines.CancellationException
+
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
@@ -9,6 +11,7 @@ import com.signaldesk.android.incident.data.local.IncidentDao
 import com.signaldesk.android.incident.data.local.IncidentEntity
 import com.signaldesk.android.incident.data.local.toEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class CachedIncidentRepositoryTest {
@@ -181,6 +184,50 @@ class CachedIncidentRepositoryTest {
             IncidentStatus.INVESTIGATING,
             loaded.status
         )
+    }
+
+    @Test
+    fun listCancellationIsNotConvertedToCacheFallback() {
+        val remote = FakeRemoteRepository(
+            loadError = CancellationException(
+                "Superseded"
+            )
+        )
+
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(id = 41).toEntity()
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        assertThrows(CancellationException::class.java) {
+            repository.getIncidents()
+        }
+    }
+
+    @Test
+    fun detailCancellationIsNotConvertedToCacheFallback() {
+        val remote = FakeRemoteRepository(
+            incidentLoadError = CancellationException(
+                "Superseded"
+            )
+        )
+
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(id = 41).toEntity()
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        assertThrows(CancellationException::class.java) {
+            repository.getIncident(41)
+        }
     }
 
     @Test

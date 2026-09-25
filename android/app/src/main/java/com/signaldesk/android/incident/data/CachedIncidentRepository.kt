@@ -1,5 +1,7 @@
 package com.signaldesk.android.incident.data
 
+import kotlinx.coroutines.CancellationException
+
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
@@ -26,7 +28,11 @@ class CachedIncidentRepository(
             local.replaceIncidents(
                 remoteIncidents.map { it.toEntity() }
             )
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            if (error is CancellationException) {
+                throw error
+            }
+
             // Existing local data remains available when refresh fails.
         }
 
@@ -49,6 +55,10 @@ class CachedIncidentRepository(
 
             incident
         } catch (error: Exception) {
+            if (error is CancellationException) {
+                throw error
+            }
+
             local.getIncident(incidentId)
                 ?.toDomain()
                 ?: throw error
