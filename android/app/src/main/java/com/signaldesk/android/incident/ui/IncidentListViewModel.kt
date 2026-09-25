@@ -22,6 +22,9 @@ data class IncidentListUiState(
     val selectedSeverity: Severity? = null,
     val isCreatingIncident: Boolean = false,
     val createIncidentError: String? = null,
+    val selectedIncident: Incident? = null,
+    val isIncidentLoading: Boolean = false,
+    val incidentError: String? = null,
     val createdIncidentId: Long? = null,
     val updatingIncidentId: Long? = null,
     val timeline: List<IncidentTimelineEvent> = emptyList(),
@@ -172,6 +175,52 @@ class IncidentListViewModel(
         )
     }
 
+    fun loadIncident(
+        incidentId: Long
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                selectedIncident = null,
+                isIncidentLoading = true,
+                incidentError = null
+            )
+
+            try {
+                val incident = withContext(Dispatchers.IO) {
+                    repository.getIncident(
+                        incidentId = incidentId
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    selectedIncident = incident,
+                    isIncidentLoading = false,
+                    incidentError = null
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    selectedIncident = null,
+                    isIncidentLoading = false,
+                    incidentError = exception.message
+                        ?: "Unable to load incident"
+                )
+            }
+        }
+    }
+
+    fun clearIncidentDetail() {
+        _uiState.value = _uiState.value.copy(
+            selectedIncident = null,
+            isIncidentLoading = false,
+            incidentError = null,
+            timeline = emptyList(),
+            isTimelineLoading = false,
+            timelineError = null,
+            isAddingNote = false,
+            noteError = null
+        )
+    }
+
     fun loadIncidentTimeline(
         incidentId: Long
     ) {
@@ -278,6 +327,12 @@ class IncidentListViewModel(
                             incident
                         }
                     },
+                    selectedIncident =
+                        if (_uiState.value.selectedIncident?.id == updatedIncident.id) {
+                            updatedIncident
+                        } else {
+                            _uiState.value.selectedIncident
+                        },
                     updatingIncidentId = null
                 )
 

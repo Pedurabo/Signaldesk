@@ -12,6 +12,10 @@ interface IncidentRepository {
         severity: Severity? = null
     ): List<Incident>
 
+    fun getIncident(
+        incidentId: Long
+    ): Incident
+
     fun createIncident(
         title: String,
         description: String,
@@ -72,6 +76,16 @@ class FakeIncidentRepository : IncidentRepository {
 
             matchesStatus && matchesSeverity
         }
+    }
+
+    override fun getIncident(
+        incidentId: Long
+    ): Incident {
+        return incidents.firstOrNull { incident ->
+            incident.id == incidentId
+        } ?: throw IllegalArgumentException(
+            "Incident $incidentId was not found"
+        )
     }
 
     override fun getIncidentTimeline(

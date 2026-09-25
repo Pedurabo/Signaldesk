@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import com.signaldesk.android.incident.ui.CreateIncidentScreen
 import com.signaldesk.android.incident.ui.IncidentDetailScreen
+import com.signaldesk.android.incident.ui.IncidentDetailStateScreen
 import com.signaldesk.android.incident.ui.IncidentListScreen
 import com.signaldesk.android.incident.ui.IncidentListViewModel
 import com.signaldesk.android.incident.ui.IncidentListViewModelFactory
@@ -50,6 +51,10 @@ class MainActivity : ComponentActivity() {
                         isCreatingIncident = false
                         selectedIncidentId = createdIncidentId
 
+                        viewModel.loadIncident(
+                            incidentId = createdIncidentId
+                        )
+
                         viewModel.loadIncidentTimeline(
                             incidentId = createdIncidentId
                         )
@@ -58,9 +63,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val incident = selectedIncidentId?.let { incidentId ->
-                    uiState.incidents.firstOrNull { it.id == incidentId }
-                }
 
                 if (isCreatingIncident) {
                     CreateIncidentScreen(
@@ -89,6 +91,10 @@ class MainActivity : ComponentActivity() {
                         onIncidentClick = { clickedIncident ->
                             selectedIncidentId = clickedIncident.id
 
+                            viewModel.loadIncident(
+                                incidentId = clickedIncident.id
+                            )
+
                             viewModel.loadIncidentTimeline(
                                 incidentId = clickedIncident.id
                             )
@@ -97,33 +103,62 @@ class MainActivity : ComponentActivity() {
                             isCreatingIncident = true
                         }
                     )
-                } else if (incident != null) {
-                    IncidentDetailScreen(
-                        incident = incident,
-                        timeline = uiState.timeline,
-                        isTimelineLoading = uiState.isTimelineLoading,
-                        timelineError = uiState.timelineError,
-                        isAddingNote = uiState.isAddingNote,
-                        noteError = uiState.noteError,
-                        isUpdating = uiState.updatingIncidentId == incident.id,
-                        error = uiState.error,
-                        onAddNote = { message ->
-                            viewModel.addIncidentNote(
-                                incidentId = incident.id,
-                                message = message
+                } else {
+                    val incident = uiState.selectedIncident
+                    val incidentId = selectedIncidentId
+
+                    when {
+                        uiState.isIncidentLoading -> {
+                            IncidentDetailStateScreen(
+                                isLoading = true,
+                                error = null,
+                                onRetry = {}
                             )
-                        },
-                        onStatusChange = { newStatus ->
-                            viewModel.updateIncidentStatus(
-                                incidentId = incident.id,
-                                status = newStatus
-                            )
-                        },
-                        onBack = {
-                            selectedIncidentId = null
-                            viewModel.refreshIncidents()
                         }
-                    )
+
+                        uiState.incidentError != null && incidentId != null -> {
+                            IncidentDetailStateScreen(
+                                isLoading = false,
+                                error = uiState.incidentError,
+                                onRetry = {
+                                    viewModel.loadIncident(
+                                        incidentId = incidentId
+                                    )
+                                }
+                            )
+                        }
+
+                        incident != null -> {
+                            IncidentDetailScreen(
+                                incident = incident,
+                                timeline = uiState.timeline,
+                                isTimelineLoading = uiState.isTimelineLoading,
+                                timelineError = uiState.timelineError,
+                                isAddingNote = uiState.isAddingNote,
+                                noteError = uiState.noteError,
+                                isUpdating =
+                                    uiState.updatingIncidentId == incident.id,
+                                error = uiState.error,
+                                onAddNote = { message ->
+                                    viewModel.addIncidentNote(
+                                        incidentId = incident.id,
+                                        message = message
+                                    )
+                                },
+                                onStatusChange = { newStatus ->
+                                    viewModel.updateIncidentStatus(
+                                        incidentId = incident.id,
+                                        status = newStatus
+                                    )
+                                },
+                                onBack = {
+                                    selectedIncidentId = null
+                                    viewModel.clearIncidentDetail()
+                                    viewModel.refreshIncidents()
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }

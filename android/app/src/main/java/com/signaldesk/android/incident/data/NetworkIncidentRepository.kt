@@ -60,6 +60,46 @@ class NetworkIncidentRepository(
         }
     }
 
+    override fun getIncident(
+        incidentId: Long
+    ): Incident {
+        val connection =
+            URL("$baseUrl/api/incidents/$incidentId")
+                .openConnection() as HttpURLConnection
+
+        return try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 10_000
+
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException(
+                    "Failed to load incident: HTTP ${connection.responseCode}"
+                )
+            }
+
+            val response = connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+            val json = JSONObject(response)
+
+            Incident(
+                id = json.getLong("id"),
+                title = json.getString("title"),
+                description = json.getString("description"),
+                severity = Severity.valueOf(
+                    json.getString("severity")
+                ),
+                status = IncidentStatus.valueOf(
+                    json.getString("status")
+                )
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     override fun getIncidentTimeline(
         incidentId: Long
     ): List<IncidentTimelineEvent> {
