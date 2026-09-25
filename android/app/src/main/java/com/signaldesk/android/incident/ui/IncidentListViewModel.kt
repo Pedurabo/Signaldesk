@@ -7,7 +7,9 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +38,8 @@ class IncidentListViewModel(
     val uiState: StateFlow<IncidentListUiState> =
         _uiState.asStateFlow()
 
+    private var loadIncidentsJob: Job? = null
+
     init {
         loadIncidents()
     }
@@ -44,7 +48,9 @@ class IncidentListViewModel(
         val status = _uiState.value.selectedStatus
         val severity = _uiState.value.selectedSeverity
 
-        viewModelScope.launch {
+        loadIncidentsJob?.cancel()
+
+        loadIncidentsJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
                 error = null
@@ -63,6 +69,8 @@ class IncidentListViewModel(
                     isLoading = false,
                     error = null
                 )
+            } catch (exception: CancellationException) {
+                throw exception
             } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(
                     incidents = emptyList(),
