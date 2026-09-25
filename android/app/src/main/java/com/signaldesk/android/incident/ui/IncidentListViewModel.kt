@@ -3,6 +3,7 @@ package com.signaldesk.android.incident.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.signaldesk.android.incident.Incident
+import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +16,7 @@ import kotlinx.coroutines.withContext
 data class IncidentListUiState(
     val incidents: List<Incident> = emptyList(),
     val isLoading: Boolean = false,
+    val updatingIncidentId: Long? = null,
     val error: String? = null
 )
 
@@ -53,6 +55,46 @@ class IncidentListViewModel(
                     incidents = emptyList(),
                     isLoading = false,
                     error = exception.message ?: "Unable to load incidents"
+                )
+            }
+        }
+    }
+
+    fun updateIncidentStatus(
+        incidentId: Long,
+        status: IncidentStatus
+    ) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+
+            _uiState.value = currentState.copy(
+                updatingIncidentId = incidentId,
+                error = null
+            )
+
+            try {
+                val updatedIncident = withContext(Dispatchers.IO) {
+                    repository.updateIncidentStatus(
+                        incidentId = incidentId,
+                        status = status
+                    )
+                }
+
+                _uiState.value = _uiState.value.copy(
+                    incidents = _uiState.value.incidents.map { incident ->
+                        if (incident.id == updatedIncident.id) {
+                            updatedIncident
+                        } else {
+                            incident
+                        }
+                    },
+                    updatingIncidentId = null
+                )
+            } catch (exception: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    updatingIncidentId = null,
+                    error = exception.message
+                        ?: "Unable to update incident status"
                 )
             }
         }

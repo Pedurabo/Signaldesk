@@ -9,7 +9,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import com.signaldesk.android.incident.ui.IncidentDetailScreen
 import com.signaldesk.android.incident.ui.IncidentListScreen
@@ -25,7 +24,7 @@ class MainActivity : ComponentActivity() {
         )
     }
 
-    private var selectedIncident by mutableStateOf<Incident?>(null)
+    private var selectedIncidentId by mutableStateOf<Long?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,22 +36,32 @@ class MainActivity : ComponentActivity() {
 
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-                val incident = selectedIncident
+                val incident = selectedIncidentId?.let { incidentId ->
+                    uiState.incidents.firstOrNull { it.id == incidentId }
+                }
 
-                if (incident == null) {
+                if (selectedIncidentId == null) {
                     IncidentListScreen(
                         incidents = uiState.incidents,
                         isLoading = uiState.isLoading,
                         error = uiState.error,
                         onIncidentClick = { clickedIncident ->
-                            selectedIncident = clickedIncident
+                            selectedIncidentId = clickedIncident.id
                         }
                     )
-                } else {
+                } else if (incident != null) {
                     IncidentDetailScreen(
                         incident = incident,
+                        isUpdating = uiState.updatingIncidentId == incident.id,
+                        error = uiState.error,
+                        onStatusChange = { newStatus ->
+                            viewModel.updateIncidentStatus(
+                                incidentId = incident.id,
+                                status = newStatus
+                            )
+                        },
                         onBack = {
-                            selectedIncident = null
+                            selectedIncidentId = null
                         }
                     )
                 }

@@ -18,11 +18,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.signaldesk.android.incident.Incident
+import com.signaldesk.android.incident.IncidentStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncidentDetailScreen(
     incident: Incident,
+    isUpdating: Boolean,
+    error: String?,
+    onStatusChange: (IncidentStatus) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -137,7 +141,63 @@ fun IncidentDetailScreen(
                 }
             }
 
-            Button(
+            when (incident.status) {
+                IncidentStatus.OPEN -> {
+                    Button(
+                        onClick = {
+                            onStatusChange(
+                                IncidentStatus.INVESTIGATING
+                            )
+                        },
+                        enabled = !isUpdating,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (isUpdating) {
+                                "Updating..."
+                            } else {
+                                "Start investigating"
+                            }
+                        )
+                    }
+                }
+
+                IncidentStatus.INVESTIGATING -> {
+                    Button(
+                        onClick = {
+                            onStatusChange(
+                                IncidentStatus.RESOLVED
+                            )
+                        },
+                        enabled = !isUpdating,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (isUpdating) {
+                                "Updating..."
+                            } else {
+                                "Resolve incident"
+                            }
+                        )
+                    }
+                }
+
+                IncidentStatus.RESOLVED -> {
+                    Text(
+                        text = "This incident is resolved.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            if (error != null) {
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            TextButton(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth()
             ) {
