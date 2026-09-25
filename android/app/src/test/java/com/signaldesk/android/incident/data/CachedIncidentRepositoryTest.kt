@@ -231,6 +231,93 @@ class CachedIncidentRepositoryTest {
     }
 
     @Test
+    fun successfulEmptyRefreshClearsExistingLocalCache() {
+        val remote = FakeRemoteRepository(
+            incidents = emptyList()
+        )
+
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(id = 41).toEntity(),
+                incident(id = 42).toEntity()
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        val incidents = repository.getIncidents()
+
+        assertEquals(
+            emptyList<Incident>(),
+            incidents
+        )
+
+        assertEquals(
+            emptyList<IncidentEntity>(),
+            local.getIncidents()
+        )
+    }
+
+    @Test
+    fun createdIncidentIsWrittenToLocalCache() {
+        val remote = FakeRemoteRepository()
+        val local = FakeIncidentDao()
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        val created = repository.createIncident(
+            title = "Database latency",
+            description = "Queries are slow",
+            severity = Severity.CRITICAL
+        )
+
+        assertEquals(100L, created.id)
+
+        assertEquals(
+            "Database latency",
+            local.getIncident(100)?.title
+        )
+
+        assertEquals(
+            "CRITICAL",
+            local.getIncident(100)?.severity
+        )
+
+        assertEquals(
+            "OPEN",
+            local.getIncident(100)?.status
+        )
+    }
+
+    @Test
+    fun incidentLoadRethrowsRemoteFailureWhenCacheIsMissing() {
+        val remoteError =
+            IllegalStateException("Offline")
+
+        val remote = FakeRemoteRepository(
+            incidentLoadError = remoteError
+        )
+
+        val local = FakeIncidentDao()
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        val thrown = assertThrows(
+            IllegalStateException::class.java
+        ) {
+            repository.getIncident(41)
+        }
+
+        assertEquals(
+            remoteError,
+            thrown
+        )
+    }
+
+    @Test
     fun statusUpdateIsWrittenToLocalCache() {
         val updated = incident(
             id = 41,

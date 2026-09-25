@@ -121,6 +121,47 @@ class IncidentDaoTest {
     }
 
     @Test
+    fun replacingIncidentsRemovesStaleRows() {
+        dao.upsertIncidents(
+            listOf(
+                incident(id = 41),
+                incident(id = 42)
+            )
+        )
+
+        dao.replaceIncidents(
+            listOf(
+                incident(id = 43)
+            )
+        )
+
+        assertEquals(
+            listOf(43L),
+            dao.getIncidents().map { it.id }
+        )
+
+        assertNull(dao.getIncident(41))
+        assertNull(dao.getIncident(42))
+    }
+
+    @Test
+    fun replacingIncidentsWithEmptyListClearsDatabase() {
+        dao.upsertIncidents(
+            listOf(
+                incident(id = 41),
+                incident(id = 42)
+            )
+        )
+
+        dao.replaceIncidents(emptyList())
+
+        assertEquals(
+            emptyList<IncidentEntity>(),
+            dao.getIncidents()
+        )
+    }
+
+    @Test
     fun incidentsCanBeFilteredByStatus() {
         dao.upsertIncidents(
             listOf(
