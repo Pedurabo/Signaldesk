@@ -3,6 +3,7 @@ package com.signaldesk.android.incident.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.signaldesk.android.incident.Incident
@@ -99,6 +100,43 @@ class IncidentListScreenTest {
         composeRule.runOnIdle {
             assert(clickedIncident == incident) {
                 "Expected clicked incident $incident but was $clickedIncident"
+            }
+        }
+    }
+    @Test
+    fun selectingStatusFilterReturnsSelectedStatus() {
+        var selectedStatus: IncidentStatus? = null
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = emptyList(),
+                    isLoading = false,
+                    error = null,
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {
+                        selectedStatus = it
+                    },
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onCreateIncidentClick = {}
+                )
+            }
+        }
+
+        composeRule
+            .onAllNodesWithText("ALL")[0]
+            .performClick()
+
+        composeRule
+            .onNodeWithText("INVESTIGATING")
+            .assertIsDisplayed()
+            .performClick()
+
+        composeRule.runOnIdle {
+            assert(selectedStatus == IncidentStatus.INVESTIGATING) {
+                "Expected INVESTIGATING but was $selectedStatus"
             }
         }
     }
