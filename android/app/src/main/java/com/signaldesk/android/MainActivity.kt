@@ -38,7 +38,8 @@ class MainActivity : ComponentActivity() {
 
     private val listViewModel: IncidentListViewModel by viewModels {
         IncidentListViewModelFactory(
-            repository
+            repository = repository,
+            observableRepository = repository
         )
     }
 

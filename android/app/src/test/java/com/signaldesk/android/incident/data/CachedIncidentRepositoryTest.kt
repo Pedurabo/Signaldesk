@@ -1,5 +1,10 @@
 package com.signaldesk.android.incident.data
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CancellationException
 
 import com.signaldesk.android.incident.Incident
@@ -528,6 +533,51 @@ class CachedIncidentRepositoryTest {
         )
     }
 
+
+    @Test
+    fun observedIncidentsComeFromLocalCache() = runBlocking {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.OPEN,
+                    severity = Severity.HIGH
+                ).toEntity(),
+                incident(
+                    id = 42,
+                    status = IncidentStatus.RESOLVED,
+                    severity = Severity.CRITICAL
+                ).toEntity()
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(
+                remote = FakeRemoteRepository(),
+                local = local
+            )
+
+        val incidents =
+            repository.observeIncidents(
+                status = IncidentStatus.OPEN,
+                severity = Severity.HIGH
+            ).first()
+
+        assertEquals(
+            listOf(41L),
+            incidents.map { it.id }
+        )
+
+        assertEquals(
+            IncidentStatus.OPEN,
+            incidents.single().status
+        )
+
+        assertEquals(
+            Severity.HIGH,
+            incidents.single().severity
+        )
+    }
 }
 
 private class FakeIncidentDao(
@@ -536,6 +586,9 @@ private class FakeIncidentDao(
 
     private val incidents =
         initialIncidents.associateBy { it.id }.toMutableMap()
+
+    private val incidentState =
+        MutableStateFlow(incidents.values.toList())
 
     var requestedStatus: String? = null
     var requestedSeverity: String? = null
@@ -555,6 +608,19 @@ private class FakeIncidentDao(
             .sortedByDescending { it.id }
     }
 
+    override fun observeIncidents(
+        status: String?,
+        severity: String?
+    ): Flow<List<IncidentEntity>> {
+        return incidentState.map { current ->
+            current
+                .filter { incident ->
+                    (status == null || incident.status == status) &&
+                        (severity == null || incident.severity == severity)
+                }
+                .sortedByDescending { it.id }
+        }
+    }
     override fun getIncident(
         incidentId: Long
     ): IncidentEntity? {
@@ -567,16 +633,22 @@ private class FakeIncidentDao(
         incidents.forEach { incident ->
             this.incidents[incident.id] = incident
         }
+
+        incidentState.value =
+            this.incidents.values.toList()
     }
 
     override fun upsertIncident(
         incident: IncidentEntity
     ) {
         incidents[incident.id] = incident
+        incidentState.value =
+            incidents.values.toList()
     }
 
     override fun deleteAllIncidents() {
         incidents.clear()
+        incidentState.value = emptyList()
     }
 
     private val timelineEvents =

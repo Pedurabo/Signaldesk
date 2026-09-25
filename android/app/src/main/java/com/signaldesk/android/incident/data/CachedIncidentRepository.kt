@@ -1,6 +1,8 @@
 package com.signaldesk.android.incident.data
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
@@ -13,7 +15,18 @@ import com.signaldesk.android.incident.data.local.toEntity
 class CachedIncidentRepository(
     private val remote: IncidentRepository,
     private val local: IncidentDao
-) : IncidentRepository {
+) : IncidentRepository, ObservableIncidentRepository {
+    override fun observeIncidents(
+        status: IncidentStatus?,
+        severity: Severity?
+    ): Flow<List<Incident>> {
+        return local.observeIncidents(
+            status = status?.name,
+            severity = severity?.name
+        ).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
 
     override fun getIncidents(
         status: IncidentStatus?,

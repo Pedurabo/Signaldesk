@@ -1,5 +1,13 @@
 package com.signaldesk.android.incident.data.local
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -413,6 +421,53 @@ class IncidentDaoTest {
             type = "CREATED",
             message = message,
             createdAt = "2026-09-25T12:00:00Z"
+        )
+    }
+
+    @Test
+    fun observedIncidentsEmitWhenDatabaseChanges() = runBlocking {
+        val emissions =
+            mutableListOf<List<IncidentEntity>>()
+
+        val initialEmissionReceived =
+            CompletableDeferred<Unit>()
+
+        val collectionJob =
+            launch(
+                start = CoroutineStart.UNDISPATCHED
+            ) {
+                dao.observeIncidents()
+                    .onEach { incidents ->
+                        if (
+                            incidents.isEmpty() &&
+                            !initialEmissionReceived.isCompleted
+                        ) {
+                            initialEmissionReceived.complete(Unit)
+                        }
+                    }
+                    .take(2)
+                    .toList(emissions)
+            }
+
+        initialEmissionReceived.await()
+
+        dao.upsertIncident(
+            incident(
+                id = 41,
+                status = "OPEN"
+            )
+        )
+
+        collectionJob.join()
+
+        assertEquals(
+            emptyList<IncidentEntity>(),
+            emissions[0]
+        )
+
+        assertEquals(
+            listOf(41L),
+            emissions[1].map { it.id }
         )
     }
 }

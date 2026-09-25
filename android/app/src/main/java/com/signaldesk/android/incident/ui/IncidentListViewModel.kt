@@ -7,6 +7,7 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
+import com.signaldesk.android.incident.data.ObservableIncidentRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ data class IncidentListUiState(
 
 class IncidentListViewModel(
     private val repository: IncidentRepository = NetworkIncidentRepository(),
+    private val observableRepository: ObservableIncidentRepository? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -41,9 +43,32 @@ class IncidentListViewModel(
         _uiState.asStateFlow()
 
     private var loadIncidentsJob: Job? = null
+    private var observeIncidentsJob: Job? = null
 
     init {
+        observeIncidents()
         loadIncidents()
+    }
+
+    private fun observeIncidents() {
+        val observableRepository =
+            observableRepository ?: return
+
+        observeIncidentsJob?.cancel()
+
+        val status = _uiState.value.selectedStatus
+        val severity = _uiState.value.selectedSeverity
+
+        observeIncidentsJob = viewModelScope.launch {
+            observableRepository.observeIncidents(
+                status = status,
+                severity = severity
+            ).collect { incidents ->
+                _uiState.value = _uiState.value.copy(
+                    incidents = incidents
+                )
+            }
+        }
     }
 
     private fun loadIncidents() {
@@ -66,20 +91,37 @@ class IncidentListViewModel(
                     )
                 }
 
-                _uiState.value = _uiState.value.copy(
-                    incidents = incidents,
-                    isLoading = false,
-                    error = null
-                )
+                _uiState.value =
+                    if (observableRepository == null) {
+                        _uiState.value.copy(
+                            incidents = incidents,
+                            isLoading = false,
+                            error = null
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isLoading = false,
+                            error = null
+                        )
+                    }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    incidents = emptyList(),
-                    isLoading = false,
-                    error = exception.message
-                        ?: "Unable to load incidents"
-                )
+                _uiState.value =
+                    if (observableRepository == null) {
+                        _uiState.value.copy(
+                            incidents = emptyList(),
+                            isLoading = false,
+                            error = exception.message
+                                ?: "Unable to load incidents"
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isLoading = false,
+                            error = exception.message
+                                ?: "Unable to load incidents"
+                        )
+                    }
             }
         }
     }
@@ -97,6 +139,7 @@ class IncidentListViewModel(
             selectedStatus = status
         )
 
+        observeIncidents()
         loadIncidents()
     }
 
@@ -109,6 +152,7 @@ class IncidentListViewModel(
             selectedSeverity = severity
         )
 
+        observeIncidents()
         loadIncidents()
     }
     fun createIncident(
@@ -149,15 +193,24 @@ class IncidentListViewModel(
                     )
                 }
 
-                _uiState.value = _uiState.value.copy(
-                    incidents = listOf(createdIncident) +
-                        _uiState.value.incidents.filterNot {
-                            it.id == createdIncident.id
-                        },
-                    isCreatingIncident = false,
-                    createIncidentError = null,
-                    createdIncidentId = createdIncident.id
-                )
+                _uiState.value =
+                    if (observableRepository == null) {
+                        _uiState.value.copy(
+                            incidents = listOf(createdIncident) +
+                                _uiState.value.incidents.filterNot {
+                                    it.id == createdIncident.id
+                                },
+                            isCreatingIncident = false,
+                            createIncidentError = null,
+                            createdIncidentId = createdIncident.id
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isCreatingIncident = false,
+                            createIncidentError = null,
+                            createdIncidentId = createdIncident.id
+                        )
+                    }
             } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isCreatingIncident = false,

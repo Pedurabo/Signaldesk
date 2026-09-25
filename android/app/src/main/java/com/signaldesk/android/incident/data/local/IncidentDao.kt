@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface IncidentDao {
@@ -21,6 +22,19 @@ interface IncidentDao {
         status: String? = null,
         severity: String? = null
     ): List<IncidentEntity>
+
+    @Query(
+        """
+        SELECT * FROM incidents
+        WHERE (:status IS NULL OR status = :status)
+          AND (:severity IS NULL OR severity = :severity)
+        ORDER BY id DESC
+        """
+    )
+    fun observeIncidents(
+        status: String? = null,
+        severity: String? = null
+    ): Flow<List<IncidentEntity>>
 
     @Query("SELECT * FROM incidents WHERE id = :incidentId")
     fun getIncident(
