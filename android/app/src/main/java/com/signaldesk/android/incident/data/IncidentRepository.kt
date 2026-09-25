@@ -7,7 +7,10 @@ import com.signaldesk.android.incident.Severity
 
 interface IncidentRepository {
 
-    fun getIncidents(): List<Incident>
+    fun getIncidents(
+        status: IncidentStatus? = null,
+        severity: Severity? = null
+    ): List<Incident>
 
     fun createIncident(
         title: String,
@@ -56,8 +59,19 @@ class FakeIncidentRepository : IncidentRepository {
         )
     )
 
-    override fun getIncidents(): List<Incident> {
-        return incidents.toList()
+    override fun getIncidents(
+        status: IncidentStatus?,
+        severity: Severity?
+    ): List<Incident> {
+        return incidents.filter { incident ->
+            val matchesStatus =
+                status == null || incident.status == status
+
+            val matchesSeverity =
+                severity == null || incident.severity == severity
+
+            matchesStatus && matchesSeverity
+        }
     }
 
     override fun getIncidentTimeline(

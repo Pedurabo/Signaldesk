@@ -82,6 +82,10 @@ class MainActivity : ComponentActivity() {
                         incidents = uiState.incidents,
                         isLoading = uiState.isLoading,
                         error = uiState.error,
+                        selectedStatus = uiState.selectedStatus,
+                        selectedSeverity = uiState.selectedSeverity,
+                        onStatusFilterChange = viewModel::setStatusFilter,
+                        onSeverityFilterChange = viewModel::setSeverityFilter,
                         onIncidentClick = { clickedIncident ->
                             selectedIncidentId = clickedIncident.id
 
@@ -117,6 +121,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onBack = {
                             selectedIncidentId = null
+                            viewModel.refreshIncidents()
                         }
                     )
                 }

@@ -18,6 +18,8 @@ import kotlinx.coroutines.withContext
 data class IncidentListUiState(
     val incidents: List<Incident> = emptyList(),
     val isLoading: Boolean = false,
+    val selectedStatus: IncidentStatus? = null,
+    val selectedSeverity: Severity? = null,
     val isCreatingIncident: Boolean = false,
     val createIncidentError: String? = null,
     val createdIncidentId: Long? = null,
@@ -46,30 +48,66 @@ class IncidentListViewModel(
     }
 
     private fun loadIncidents() {
+        val status = _uiState.value.selectedStatus
+        val severity = _uiState.value.selectedSeverity
+
         viewModelScope.launch {
-            _uiState.value = IncidentListUiState(
-                isLoading = true
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null
             )
 
             try {
                 val incidents = withContext(Dispatchers.IO) {
-                    repository.getIncidents()
+                    repository.getIncidents(
+                        status = status,
+                        severity = severity
+                    )
                 }
 
-                _uiState.value = IncidentListUiState(
+                _uiState.value = _uiState.value.copy(
                     incidents = incidents,
-                    isLoading = false
+                    isLoading = false,
+                    error = null
                 )
             } catch (exception: Exception) {
-                _uiState.value = IncidentListUiState(
+                _uiState.value = _uiState.value.copy(
                     incidents = emptyList(),
                     isLoading = false,
-                    error = exception.message ?: "Unable to load incidents"
+                    error = exception.message
+                        ?: "Unable to load incidents"
                 )
             }
         }
     }
 
+    fun refreshIncidents() {
+        loadIncidents()
+    }
+
+    fun setStatusFilter(status: IncidentStatus?) {
+        if (_uiState.value.selectedStatus == status) {
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            selectedStatus = status
+        )
+
+        loadIncidents()
+    }
+
+    fun setSeverityFilter(severity: Severity?) {
+        if (_uiState.value.selectedSeverity == severity) {
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            selectedSeverity = severity
+        )
+
+        loadIncidents()
+    }
     fun createIncident(
         title: String,
         description: String,

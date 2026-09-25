@@ -14,9 +14,30 @@ class NetworkIncidentRepository(
     private val baseUrl: String = "http://10.0.2.2:8082"
 ) : IncidentRepository {
 
-    override fun getIncidents(): List<Incident> {
-        val connection = URL("$baseUrl/api/incidents")
-            .openConnection() as HttpURLConnection
+    override fun getIncidents(
+        status: IncidentStatus?,
+        severity: Severity?
+    ): List<Incident> {
+        val queryParameters = mutableListOf<String>()
+
+        if (status != null) {
+            queryParameters += "status=${status.name}"
+        }
+
+        if (severity != null) {
+            queryParameters += "severity=${severity.name}"
+        }
+
+        val queryString =
+            if (queryParameters.isEmpty()) {
+                ""
+            } else {
+                "?${queryParameters.joinToString("&")}"
+            }
+
+        val connection =
+            URL("$baseUrl/api/incidents$queryString")
+                .openConnection() as HttpURLConnection
 
         return try {
             connection.requestMethod = "GET"
