@@ -8,6 +8,7 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +29,8 @@ data class IncidentDetailUiState(
 )
 
 class IncidentDetailViewModel(
-    private val repository: IncidentRepository = NetworkIncidentRepository()
+    private val repository: IncidentRepository = NetworkIncidentRepository(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -49,7 +51,7 @@ class IncidentDetailViewModel(
             )
 
             try {
-                val incident = withContext(Dispatchers.IO) {
+                val incident = withContext(ioDispatcher) {
                     repository.getIncident(
                         incidentId = incidentId
                     )
@@ -82,7 +84,7 @@ class IncidentDetailViewModel(
             )
 
             try {
-                val updatedIncident = withContext(Dispatchers.IO) {
+                val updatedIncident = withContext(ioDispatcher) {
                     repository.updateIncidentStatus(
                         incidentId = incidentId,
                         status = status
@@ -119,7 +121,7 @@ class IncidentDetailViewModel(
             )
 
             try {
-                val timeline = withContext(Dispatchers.IO) {
+                val timeline = withContext(ioDispatcher) {
                     repository.getIncidentTimeline(
                         incidentId = incidentId
                     )
@@ -161,7 +163,7 @@ class IncidentDetailViewModel(
             )
 
             try {
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     repository.addIncidentNote(
                         incidentId = incidentId,
                         message = trimmedMessage
