@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 @Dao
 interface IncidentDao {
@@ -32,4 +33,12 @@ interface IncidentDao {
 
     @Query("DELETE FROM incidents")
     fun deleteAllIncidents()
+
+    @Transaction
+    fun replaceIncidents(
+        incidents: List<IncidentEntity>
+    ) {
+        deleteAllIncidents()
+        upsertIncidents(incidents)
+    }
 }
