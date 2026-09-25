@@ -14,11 +14,13 @@ type IncidentCardProps = {
     incidentId: number,
     status: IncidentStatus
   ) => Promise<void>
+  onOpenDetails: (incidentId: number) => void
 }
 
 export function IncidentCard({
   incident,
   onStatusChange,
+  onOpenDetails,
 }: IncidentCardProps) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -143,6 +145,13 @@ export function IncidentCard({
               ? 'Hide timeline'
               : 'View timeline'}
         </button>
+        <button
+          className="timeline-action"
+          type="button"
+          onClick={() => onOpenDetails(incident.id)}
+        >
+          Open details
+        </button>
       </div>
 
       {error && (
@@ -173,3 +182,4 @@ export function IncidentCard({
     </article>
   )
 }
+

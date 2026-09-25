@@ -6,6 +6,7 @@ import {
   type CreateIncidentRequest,
 } from './api/incidents'
 import { IncidentCard } from './components/IncidentCard'
+import { IncidentDetail } from './components/IncidentDetail'
 import { NewIncidentForm } from './components/NewIncidentForm'
 import type {
   Incident,
@@ -16,6 +17,8 @@ import './App.css'
 
 function App() {
   const [incidents, setIncidents] = useState<Incident[]>([])
+  const [selectedIncidentId, setSelectedIncidentId] =
+    useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,6 +105,15 @@ function App() {
   const criticalCount = incidents.filter(
     (incident) => incident.severity === 'CRITICAL'
   ).length
+
+  if (selectedIncidentId !== null) {
+    return (
+      <IncidentDetail
+        incidentId={selectedIncidentId}
+        onBack={() => setSelectedIncidentId(null)}
+      />
+    )
+  }
 
   return (
     <main className="dashboard">
@@ -217,6 +229,7 @@ function App() {
                 key={incident.id}
                 incident={incident}
                 onStatusChange={handleStatusChange}
+                onOpenDetails={setSelectedIncidentId}
               />
             ))}
           </div>
@@ -227,3 +240,4 @@ function App() {
 }
 
 export default App
+

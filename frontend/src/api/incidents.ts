@@ -129,3 +129,19 @@ export async function addIncidentNote(
   return response.json()
 }
 
+
+export async function getIncident(
+  incidentId: number
+): Promise<Incident> {
+  const response = await fetch(
+    `${API_URL}/${incidentId}`
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load incident: HTTP ${response.status}`
+    )
+  }
+
+  return response.json()
+}
