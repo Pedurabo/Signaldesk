@@ -425,6 +425,65 @@ class IncidentDaoTest {
     }
 
     @Test
+    fun observedTimelineEmitsWhenDatabaseChanges() = runBlocking {
+        val emissions =
+            mutableListOf<List<IncidentTimelineEventEntity>>()
+
+        val initialEmissionReceived =
+            CompletableDeferred<Unit>()
+
+        val collectionJob =
+            launch(
+                start = CoroutineStart.UNDISPATCHED
+            ) {
+                dao.observeTimeline(
+                    incidentId = 51
+                )
+                    .onEach { events ->
+                        if (
+                            events.isEmpty() &&
+                            !initialEmissionReceived.isCompleted
+                        ) {
+                            initialEmissionReceived.complete(Unit)
+                        }
+                    }
+                    .take(2)
+                    .toList(emissions)
+            }
+
+        initialEmissionReceived.await()
+
+        dao.upsertTimelineEvents(
+            listOf(
+                IncidentTimelineEventEntity(
+                    id = 901,
+                    incidentId = 51,
+                    type = "NOTE_ADDED",
+                    message = "Room timeline Flow",
+                    createdAt = "2026-09-26T00:00:00Z"
+                )
+            )
+        )
+
+        collectionJob.join()
+
+        assertEquals(
+            emptyList<IncidentTimelineEventEntity>(),
+            emissions[0]
+        )
+
+        assertEquals(
+            listOf(901L),
+            emissions[1].map { it.id }
+        )
+
+        assertEquals(
+            "NOTE_ADDED",
+            emissions[1].single().type
+        )
+    }
+
+    @Test
     fun observedIncidentEmitsWhenDatabaseChanges() = runBlocking {
         val emissions =
             mutableListOf<IncidentEntity?>()

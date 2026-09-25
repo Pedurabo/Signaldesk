@@ -23,6 +23,48 @@ import org.junit.Test
 class CachedIncidentRepositoryTest {
 
     @Test
+    fun observedTimelineComesFromLocalCache() = runBlocking {
+        val local = FakeIncidentDao()
+
+        local.upsertTimelineEvents(
+            listOf(
+                IncidentTimelineEventEntity(
+                    id = 801,
+                    incidentId = 71,
+                    type = "NOTE_ADDED",
+                    message = "Cached timeline event",
+                    createdAt = "2026-09-26T00:00:00Z"
+                )
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = local
+        )
+
+        val timeline =
+            repository.observeIncidentTimeline(
+                incidentId = 71
+            ).first()
+
+        assertEquals(
+            listOf(801L),
+            timeline.map { it.id }
+        )
+
+        assertEquals(
+            IncidentTimelineEventType.NOTE_ADDED,
+            timeline.single().type
+        )
+
+        assertEquals(
+            "Cached timeline event",
+            timeline.single().message
+        )
+    }
+
+    @Test
     fun observedIncidentComesFromLocalCache() = runBlocking {
         val cachedIncident = incident(
             id = 71,
@@ -692,6 +734,20 @@ private class FakeIncidentDao(
 
     private val timelineEvents =
         mutableMapOf<Long, IncidentTimelineEventEntity>()
+
+    override fun observeTimeline(
+        incidentId: Long
+    ): Flow<List<IncidentTimelineEventEntity>> {
+        return incidentState.map {
+            timelineEvents.values
+                .filter { event ->
+                    event.incidentId == incidentId
+                }
+                .sortedBy { event ->
+                    event.id
+                }
+        }
+    }
 
     override fun getTimeline(
         incidentId: Long

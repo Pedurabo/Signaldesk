@@ -46,7 +46,8 @@ class MainActivity : ComponentActivity() {
     private val detailViewModel: IncidentDetailViewModel by viewModels {
         IncidentDetailViewModelFactory(
             repository = repository,
-            observableRepository = repository
+            observableRepository = repository,
+            observableTimelineRepository = repository
         )
     }
 

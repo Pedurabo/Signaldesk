@@ -78,6 +78,17 @@ interface IncidentDao {
         incidentId: Long
     ): List<IncidentTimelineEventEntity>
 
+    @Query(
+        """
+        SELECT * FROM incident_timeline_events
+        WHERE incidentId = :incidentId
+        ORDER BY id ASC
+        """
+    )
+    fun observeTimeline(
+        incidentId: Long
+    ): Flow<List<IncidentTimelineEventEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun upsertTimelineEvents(
         events: List<IncidentTimelineEventEntity>

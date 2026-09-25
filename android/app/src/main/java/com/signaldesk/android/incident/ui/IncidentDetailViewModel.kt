@@ -8,6 +8,7 @@ import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.ObservableIncidentDetailRepository
+import com.signaldesk.android.incident.data.ObservableIncidentTimelineRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ data class IncidentDetailUiState(
 class IncidentDetailViewModel(
     private val repository: IncidentRepository = NetworkIncidentRepository(),
     private val observableRepository: ObservableIncidentDetailRepository? = null,
+    private val observableTimelineRepository: ObservableIncidentTimelineRepository? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -45,6 +47,26 @@ class IncidentDetailViewModel(
         _uiState.asStateFlow()
 
     private var observeIncidentJob: Job? = null
+    private var observeTimelineJob: Job? = null
+
+    private fun observeTimeline(
+        incidentId: Long
+    ) {
+        val observableTimelineRepository =
+            observableTimelineRepository ?: return
+
+        observeTimelineJob?.cancel()
+
+        observeTimelineJob = viewModelScope.launch {
+            observableTimelineRepository.observeIncidentTimeline(
+                incidentId = incidentId
+            ).collect { timeline ->
+                _uiState.value = _uiState.value.copy(
+                    timeline = timeline
+                )
+            }
+        }
+    }
 
     private fun observeIncident(
         incidentId: Long
@@ -175,12 +197,24 @@ class IncidentDetailViewModel(
     fun loadIncidentTimeline(
         incidentId: Long
     ) {
+        observeTimeline(
+            incidentId = incidentId
+        )
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
-                timeline = emptyList(),
-                isTimelineLoading = true,
-                timelineError = null
-            )
+            _uiState.value =
+                if (observableTimelineRepository == null) {
+                    _uiState.value.copy(
+                        timeline = emptyList(),
+                        isTimelineLoading = true,
+                        timelineError = null
+                    )
+                } else {
+                    _uiState.value.copy(
+                        isTimelineLoading = true,
+                        timelineError = null
+                    )
+                }
 
             try {
                 val timeline = withContext(ioDispatcher) {
@@ -189,18 +223,35 @@ class IncidentDetailViewModel(
                     )
                 }
 
-                _uiState.value = _uiState.value.copy(
-                    timeline = timeline,
-                    isTimelineLoading = false,
-                    timelineError = null
-                )
+                _uiState.value =
+                    if (observableTimelineRepository == null) {
+                        _uiState.value.copy(
+                            timeline = timeline,
+                            isTimelineLoading = false,
+                            timelineError = null
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isTimelineLoading = false,
+                            timelineError = null
+                        )
+                    }
             } catch (exception: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    timeline = emptyList(),
-                    isTimelineLoading = false,
-                    timelineError = exception.message
-                        ?: "Unable to load incident timeline"
-                )
+                _uiState.value =
+                    if (observableTimelineRepository == null) {
+                        _uiState.value.copy(
+                            timeline = emptyList(),
+                            isTimelineLoading = false,
+                            timelineError = exception.message
+                                ?: "Unable to load incident timeline"
+                        )
+                    } else {
+                        _uiState.value.copy(
+                            isTimelineLoading = false,
+                            timelineError = exception.message
+                                ?: "Unable to load incident timeline"
+                        )
+                    }
             }
         }
     }
@@ -237,9 +288,15 @@ class IncidentDetailViewModel(
                     noteError = null
                 )
 
-                loadIncidentTimeline(
-                    incidentId = incidentId
-                )
+                if (observableTimelineRepository == null) {
+
+                    loadIncidentTimeline(
+
+                        incidentId = incidentId
+
+                    )
+
+                }
             } catch (exception: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isAddingNote = false,
@@ -256,7 +313,8 @@ class IncidentDetailViewModel(
 
 class IncidentDetailViewModelFactory(
     private val repository: IncidentRepository,
-    private val observableRepository: ObservableIncidentDetailRepository
+    private val observableRepository: ObservableIncidentDetailRepository,
+    private val observableTimelineRepository: ObservableIncidentTimelineRepository
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -269,7 +327,9 @@ class IncidentDetailViewModelFactory(
         ) {
             return IncidentDetailViewModel(
                 repository = repository,
-                observableRepository = observableRepository
+                observableRepository = observableRepository,
+                observableTimelineRepository =
+                    observableTimelineRepository
             ) as T
         }
 

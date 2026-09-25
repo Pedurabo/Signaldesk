@@ -17,7 +17,8 @@ class CachedIncidentRepository(
     private val local: IncidentDao
 ) : IncidentRepository,
     ObservableIncidentRepository,
-    ObservableIncidentDetailRepository {
+    ObservableIncidentDetailRepository,
+    ObservableIncidentTimelineRepository {
     override fun observeIncidents(
         status: IncidentStatus?,
         severity: Severity?
@@ -104,6 +105,16 @@ class CachedIncidentRepository(
         local.upsertIncident(incident.toEntity())
 
         return incident
+    }
+
+    override fun observeIncidentTimeline(
+        incidentId: Long
+    ): Flow<List<IncidentTimelineEvent>> {
+        return local.observeTimeline(
+            incidentId = incidentId
+        ).map { entities ->
+            entities.map { it.toDomain() }
+        }
     }
 
     override fun getIncidentTimeline(

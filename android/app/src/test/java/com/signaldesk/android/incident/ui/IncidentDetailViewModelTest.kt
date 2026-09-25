@@ -6,6 +6,7 @@ import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.ObservableIncidentDetailRepository
+import com.signaldesk.android.incident.data.ObservableIncidentTimelineRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +129,206 @@ class IncidentDetailViewModelTest {
                 repository.requestedIncidentId
             )
         }
+    @Test
+    fun timelineRefreshFailureKeepsObservedTimeline() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 703,
+                title = "Cached timeline",
+                description = "Timeline should survive refresh failure",
+                severity = Severity.HIGH,
+                status = IncidentStatus.INVESTIGATING
+            )
+
+            val cachedTimeline = listOf(
+                IncidentTimelineEvent(
+                    id = 903,
+                    type = com.signaldesk.android.incident.IncidentTimelineEventType.CREATED,
+                    message = "Cached event",
+                    createdAt = "2026-09-26T00:20:00Z"
+                )
+            )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident,
+                    timelineLoadError =
+                        IllegalStateException(
+                            "Timeline unavailable"
+                        )
+                )
+
+            val observableTimelineRepository =
+                TestObservableIncidentTimelineRepository(
+                    timeline = cachedTimeline
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableTimelineRepository =
+                    observableTimelineRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncidentTimeline(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                cachedTimeline,
+                viewModel.uiState.value.timeline
+            )
+
+            assertFalse(
+                viewModel.uiState.value.isTimelineLoading
+            )
+
+            assertEquals(
+                "Timeline unavailable",
+                viewModel.uiState.value.timelineError
+            )
+        }
+
+    @Test
+    fun observableTimelineUpdatesTimelineState() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 704,
+                title = "Live timeline",
+                description = "Timeline follows Room emissions",
+                severity = Severity.MEDIUM,
+                status = IncidentStatus.OPEN
+            )
+
+            val initialTimeline = listOf(
+                IncidentTimelineEvent(
+                    id = 904,
+                    type = com.signaldesk.android.incident.IncidentTimelineEventType.CREATED,
+                    message = "Initial event",
+                    createdAt = "2026-09-26T00:30:00Z"
+                )
+            )
+
+            val updatedTimeline =
+                initialTimeline +
+                    IncidentTimelineEvent(
+                        id = 905,
+                        type = com.signaldesk.android.incident.IncidentTimelineEventType.NOTE_ADDED,
+                        message = "Later Room event",
+                        createdAt = "2026-09-26T00:31:00Z"
+                    )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident,
+                    timeline = initialTimeline
+                )
+
+            val observableTimelineRepository =
+                TestObservableIncidentTimelineRepository(
+                    timeline = initialTimeline
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableTimelineRepository =
+                    observableTimelineRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncidentTimeline(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                initialTimeline,
+                viewModel.uiState.value.timeline
+            )
+
+            observableTimelineRepository.emit(
+                updatedTimeline
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                updatedTimeline,
+                viewModel.uiState.value.timeline
+            )
+        }
+
+    @Test
+    fun observableTimelineOwnsTimelineState() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 702,
+                title = "Timeline ownership",
+                description = "Testing Room timeline ownership",
+                severity = Severity.HIGH,
+                status = IncidentStatus.INVESTIGATING
+            )
+
+            val refreshTimeline = listOf(
+                IncidentTimelineEvent(
+                    id = 901,
+                    type = com.signaldesk.android.incident.IncidentTimelineEventType.STATUS_CHANGED,
+                    message = "Remote refresh result",
+                    createdAt = "2026-09-26T00:10:00Z"
+                )
+            )
+
+            val observedTimeline = listOf(
+                IncidentTimelineEvent(
+                    id = 902,
+                    type = com.signaldesk.android.incident.IncidentTimelineEventType.NOTE_ADDED,
+                    message = "Room owns this state",
+                    createdAt = "2026-09-26T00:11:00Z"
+                )
+            )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident,
+                    timeline = refreshTimeline
+                )
+
+            val observableTimelineRepository =
+                TestObservableIncidentTimelineRepository(
+                    timeline = observedTimeline
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableTimelineRepository =
+                    observableTimelineRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncidentTimeline(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                observedTimeline,
+                viewModel.uiState.value.timeline
+            )
+
+            assertFalse(
+                viewModel.uiState.value.isTimelineLoading
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.timelineError
+            )
+        }
+
     @Test
     fun loadTimelineShowsRepositoryEvents() =
         runTest(testDispatcher) {
@@ -314,6 +515,77 @@ class IncidentDetailViewModelTest {
             assertEquals(
                 null,
                 repository.addedNoteMessage
+            )
+        }
+
+    @Test
+    fun observableTimelineNoteDoesNotReloadTimeline() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 705,
+                title = "Note Flow",
+                description = "Room should publish the new note",
+                severity = Severity.MEDIUM,
+                status = IncidentStatus.INVESTIGATING
+            )
+
+            val cachedTimeline = listOf(
+                IncidentTimelineEvent(
+                    id = 906,
+                    type = com.signaldesk.android.incident.IncidentTimelineEventType.CREATED,
+                    message = "Incident created",
+                    createdAt = "2026-09-26T00:40:00Z"
+                )
+            )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident
+                )
+
+            val observableTimelineRepository =
+                TestObservableIncidentTimelineRepository(
+                    timeline = cachedTimeline
+                )
+
+            val viewModel = IncidentDetailViewModel(
+                repository = repository,
+                observableTimelineRepository =
+                    observableTimelineRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            viewModel.loadIncidentTimeline(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                1,
+                repository.timelineRequestCount
+            )
+
+            viewModel.addIncidentNote(
+                incidentId = incident.id,
+                message = "  Check worker logs  "
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                1,
+                repository.addNoteRequestCount
+            )
+
+            assertEquals(
+                "Check worker logs",
+                repository.addedNoteMessage
+            )
+
+            assertEquals(
+                1,
+                repository.timelineRequestCount
             )
         }
 
@@ -622,10 +894,31 @@ private class TestObservableIncidentDetailRepository(
         incidentState.value = incident
     }
 }
+private class TestObservableIncidentTimelineRepository(
+    timeline: List<IncidentTimelineEvent>
+) : ObservableIncidentTimelineRepository {
+
+    private val timelineState =
+        MutableStateFlow(timeline)
+
+    override fun observeIncidentTimeline(
+        incidentId: Long
+    ): Flow<List<IncidentTimelineEvent>> {
+        return timelineState
+    }
+
+    fun emit(
+        timeline: List<IncidentTimelineEvent>
+    ) {
+        timelineState.value = timeline
+    }
+}
+
 private class TestIncidentDetailRepository(
     private val incident: Incident,
     private val incidentLoadError: Exception? = null,
     private val timeline: List<IncidentTimelineEvent> = emptyList(),
+    private val timelineLoadError: Exception? = null,
     private val updatedIncident: Incident = incident
 ) : IncidentRepository {
 
@@ -633,6 +926,9 @@ private class TestIncidentDetailRepository(
         private set
 
     var requestedTimelineIncidentId: Long? = null
+        private set
+
+    var timelineRequestCount: Int = 0
         private set
 
     var updatedIncidentId: Long? = null
@@ -676,7 +972,9 @@ private class TestIncidentDetailRepository(
     override fun getIncidentTimeline(
         incidentId: Long
     ): List<IncidentTimelineEvent> {
+        timelineRequestCount += 1
         requestedTimelineIncidentId = incidentId
+        timelineLoadError?.let { throw it }
         return timeline
     }
 
