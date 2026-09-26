@@ -1,65 +1,85 @@
 # SignalDesk
 
-SignalDesk is a full-stack incident-management project centered on a native Android client that remains useful when connectivity is unreliable. It combines an offline-capable Android workflow with a Kotlin/Spring Boot API and PostgreSQL persistence.
+**Offline-capable incident management for Android, backed by Kotlin/Spring Boot and PostgreSQL.**
 
-The project is being built as a production-oriented engineering case study: application architecture, local persistence, background synchronization, API design, database migrations, automated testing, release configuration, signing, containerization, and cloud deployment are treated as parts of one system rather than isolated demos.
+SignalDesk is a full-stack engineering project built around a native Android client that remains useful when connectivity is unreliable. It treats offline persistence, synchronization, API design, database migration, testing, release signing, containerization and deployment as parts of one system—not separate demos.
 
-## What it does
+> **Status:** Core Android workflows, offline synchronization, backend APIs, automated testing and signed Android release builds are implemented. Cloud deployment validation is currently in progress.
 
-The Android application supports an incident workflow with:
+## Highlights
 
-- incident list, search, refresh, loading, empty, and error states
-- incident creation with validation
-- incident detail views
-- notes and status updates
-- local Room caching for offline access
-- an outbox for mutations made while offline
-- WorkManager-based background synchronization
-- retry metadata and user-visible sync feedback
+- **Offline-first Android workflow** — incidents are cached locally with Room and remain readable without a network connection.
+- **Reliable offline mutations** — writes can be queued in a local outbox and delivered later through WorkManager.
+- **Observable synchronization** — retry attempts, timestamps and errors are tracked and surfaced rather than silently discarded.
+- **Full incident lifecycle** — list/search/refresh, create, details, notes and status updates.
+- **Kotlin backend** — Spring Boot REST API with JPA, PostgreSQL and Flyway migrations.
+- **Release-oriented engineering** — HTTPS-only release API configuration, externalized signing secrets, signed APK/AAB builds and Docker packaging.
+- **Layered verification** — backend, Android unit, Compose UI, WorkManager and Room migration tests plus physical-device validation.
+
+## Screenshots
+
+Android screenshots will be added after the final production-endpoint validation pass. The current repository intentionally avoids presenting mockups as finished product evidence.
 
 ## Architecture
 
 ```text
-Android app
-  Jetpack Compose UI
-        |
-    ViewModels
-        |
-   Repository layer
-     /        \
- Room cache   HTTP API
-     \        /
-  Offline outbox
-        |
-   WorkManager sync
-        |
-Kotlin / Spring Boot API
-        |
- Spring Data JPA
-        |
-   PostgreSQL
+┌──────────────────────── Android ────────────────────────┐
+│                                                        │
+│  Jetpack Compose UI                                    │
+│          │                                             │
+│      ViewModels                                        │
+│          │                                             │
+│      Repository                                        │
+│       /      \                                         │
+│  Room cache   REST API                                 │
+│      │           │                                     │
+│  Offline outbox  │                                     │
+│      │           │                                     │
+│  WorkManager ────┘                                     │
+└───────────────────────┬────────────────────────────────┘
+                        │ HTTPS / JSON
+                        ▼
+┌──────────────────────── Backend ────────────────────────┐
+│ Kotlin + Spring Boot                                   │
+│ Spring Web MVC → Spring Data JPA → PostgreSQL          │
+│                         │                              │
+│                       Flyway                           │
+└────────────────────────────────────────────────────────┘
 ```
 
-The Android client is designed around local persistence and synchronization rather than assuming continuous network availability. Mutations can be queued locally and retried in the background, while server data is cached for responsive reads.
+The client does not assume continuous connectivity. Server data is cached locally for responsive reads, while mutations made offline can be persisted and retried in the background until client and server state converge.
 
-## Technology
+## Android application
 
-### Android
+The Android client currently supports:
 
-- Kotlin
-- Jetpack Compose + Material 3
-- Navigation Compose
-- ViewModel / lifecycle-aware state
-- Room + KSP
-- WorkManager
-- JUnit, coroutine test utilities, Compose UI testing, AndroidX Test and WorkManager testing
-- separate debug/release network configuration
-- release signing configuration with secrets kept outside the repository
+- cached incident list with loading, empty and error states
+- search, refresh and pull-to-refresh
+- incident creation with validation
+- incident details
+- notes and status changes
+- Room-backed offline persistence
+- offline mutation outbox
+- WorkManager background synchronization
+- retry metadata and user-visible sync feedback
 
-### Backend
+### Android stack
 
-- Kotlin
-- Spring Boot 4
+| Area | Technology |
+| --- | --- |
+| Language | Kotlin |
+| UI | Jetpack Compose, Material 3 |
+| Navigation | Navigation Compose |
+| State | ViewModel / lifecycle-aware state |
+| Persistence | Room + KSP |
+| Background work | WorkManager |
+| Testing | JUnit, coroutine test utilities, Compose UI Test, AndroidX Test, WorkManager Test |
+| Release | Gradle signing config, HTTPS-only release endpoint |
+
+## Backend
+
+The backend is a Kotlin/Spring Boot service using:
+
 - Spring Web MVC
 - Spring Data JPA
 - Bean Validation
@@ -68,37 +88,38 @@ The Android client is designed around local persistence and synchronization rath
 - Java 17
 - Gradle
 
-### Delivery
+Incident operations are exposed under `/api/incidents` and cover:
 
-- multi-stage Docker build
-- environment-driven database configuration
-- environment-driven server port
-- HTTPS-only API configuration for Android release builds
-- signed APK/AAB release pipeline
+| Operation | Route shape |
+| --- | --- |
+| List incidents | `GET /api/incidents` |
+| Retrieve incident | `GET /api/incidents/{id}` |
+| Create incident | `POST /api/incidents` |
+| Change status | `PATCH /api/incidents/{id}/status` |
+| Add note | `POST /api/incidents/{id}/notes` |
+| Timeline | `GET /api/incidents/{id}/timeline` |
+| Delete incident | `DELETE /api/incidents/{id}` |
 
 ## Repository structure
 
 ```text
 Signaldesk/
-├── android/    # Native Android application
-├── backend/    # Kotlin/Spring Boot REST API
-└── frontend/   # Frontend workspace
+├── android/     # Native Android application
+├── backend/     # Kotlin/Spring Boot REST API
+└── frontend/    # Frontend workspace
 ```
 
-## API
+The Android application and backend are the implemented core of the current project. The frontend directory is retained as a separate workspace and is not the primary client described by this README.
 
-The backend exposes incident operations under `/api/incidents`, including:
+## Running the backend locally
 
-- list and retrieve incidents
-- create incidents
-- update incident status
-- add notes
-- retrieve an incident timeline
-- delete incidents
+### Prerequisites
 
-## Local backend setup
+- Java 17
+- PostgreSQL
+- the repository cloned locally
 
-The backend expects PostgreSQL and reads its connection settings from environment variables.
+The backend reads database configuration from:
 
 ```text
 SIGNALDESK_DB_URL
@@ -106,9 +127,9 @@ SIGNALDESK_DB_USERNAME
 SIGNALDESK_DB_PASSWORD
 ```
 
-Local defaults are provided for the database URL and username; the password must be supplied through the environment.
+The URL and username have local development defaults. The password must be supplied through the environment.
 
-From `backend/`:
+From `backend/` on Windows PowerShell:
 
 ```powershell
 $env:SIGNALDESK_DB_PASSWORD = Read-Host "Database password"
@@ -116,62 +137,95 @@ $env:SIGNALDESK_DB_PASSWORD = Read-Host "Database password"
 .\gradlew.bat bootRun
 ```
 
-The local API listens on port `8082` by default.
+The API listens on port `8082` by default.
 
-## Android development
+## Running Android against the local backend
 
-The debug build targets a locally running backend at `http://127.0.0.1:8082`.
+The debug build targets:
 
-For a physical Android device, ADB reverse port forwarding can expose the development machine's backend to the device:
+```text
+http://127.0.0.1:8082
+```
+
+For a physical Android device connected through ADB:
 
 ```powershell
 adb reverse tcp:8082 tcp:8082
 ```
 
-Release builds deliberately require an explicit HTTPS endpoint:
+Then install the normal debug application and launch it on the device.
+
+> Instrumentation tests and manual product verification are kept separate. Device test execution can replace/remove the normal installed app, so manual verification uses the standard debug install rather than an instrumentation-test run.
+
+## Release builds
+
+Release builds require an explicit HTTPS API endpoint. A release build will not silently fall back to the local development server.
+
+From `android/`:
 
 ```powershell
 .\gradlew.bat bundleRelease -PsignaldeskBaseUrl=https://your-api.example
 ```
 
-Release signing credentials are supplied through user-level Gradle properties and are not stored in Git.
+Signing credentials are supplied through user-level Gradle properties and are intentionally excluded from Git.
 
-## Testing and validation
+The release pipeline has been exercised with signed APK and AAB artifacts. Distribution should wait until the real HTTPS backend and durable production database are finalized.
 
-The project includes tests across multiple layers:
+## Testing
 
-- backend tests
+SignalDesk is validated across several layers:
+
+- backend automated tests
 - Android unit tests
 - Compose UI/instrumentation tests
 - WorkManager synchronization tests
 - Room migration coverage
-- physical-device validation of the Android workflow
+- manual physical-device workflow verification
 
-Manual product verification and instrumentation test execution are intentionally kept separate so automated device tests do not interfere with the installed app used for manual testing.
+The project favors small, verifiable changes and treats failures in networking, synchronization, persistence and deployment as engineering states to be handled explicitly.
 
-## Deployment status
+## Containerization and deployment
 
-The backend has been containerized and the cloud deployment path is currently being validated. Production database credentials and release endpoints are environment-specific and are not committed to the repository.
+The backend uses a multi-stage Docker build and supports environment-driven database and server configuration.
 
-The Android release pipeline has been exercised with signed APK/AAB artifacts, but a genuine production Android build should only be distributed after the production HTTPS API endpoint and durable database configuration are finalized.
+Cloud deployment validation is **in progress**. The service has reached the cloud runtime and database integration stage, but this README will not describe the API as production-ready until the deployment, persistence and Android release endpoint have been verified end to end.
 
-## Engineering focus
+No production credentials are stored in this repository.
 
-SignalDesk is intended to demonstrate more than screen implementation. The project emphasizes:
+## Engineering goals
 
+SignalDesk is designed to demonstrate:
+
+- modern native Android development
 - offline-first data handling
 - reliable background work
-- explicit retry/error state
-- persistence and schema migration
+- explicit retry and error state
+- local/remote data synchronization
+- database migration discipline
 - client/server integration
-- testable architecture
+- automated and physical-device testing
 - secure release configuration
 - reproducible backend packaging
-- production deployment discipline
+- production-oriented deployment practices
 
-## Current status
+## Roadmap
 
-Core Android incident workflows, offline persistence/synchronization, backend APIs, testing, and Android release preparation are implemented. Cloud deployment validation and final production endpoint configuration are in progress.
+- [x] Core incident list/detail/create workflows
+- [x] Room offline cache
+- [x] Offline mutation outbox
+- [x] WorkManager synchronization
+- [x] Retry metadata and sync feedback
+- [x] Backend incident API
+- [x] PostgreSQL + Flyway persistence
+- [x] Android automated testing
+- [x] Physical-device validation
+- [x] Signed APK/AAB pipeline
+- [x] Backend Docker packaging
+- [ ] Complete cloud deployment validation
+- [ ] Verify public HTTPS API end to end
+- [ ] Build Android release against the verified production endpoint
+- [ ] Add final product screenshots
+- [ ] Finalize durable production database and distribution path
 
 ## Author
 
