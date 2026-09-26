@@ -32,6 +32,7 @@ import com.signaldesk.android.incident.IncidentTimelineEvent
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncidentDetailScreen(
+    modifier: Modifier = Modifier,
     incident: Incident,
     hasPendingMutations: Boolean = false,
     syncAttemptCount: Int = 0,
@@ -46,7 +47,6 @@ fun IncidentDetailScreen(
     onAddNote: (String) -> Unit,
     onStatusChange: (IncidentStatus) -> Unit,
     onBack: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
     var noteText by remember(incident.id) {
         mutableStateOf("")

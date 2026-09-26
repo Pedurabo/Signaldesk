@@ -38,6 +38,7 @@ import com.signaldesk.android.incident.Severity
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncidentListScreen(
+    modifier: Modifier = Modifier,
     incidents: List<Incident>,
     isLoading: Boolean,
     isRefreshing: Boolean,
@@ -51,7 +52,6 @@ fun IncidentListScreen(
     onCreateIncidentClick: () -> Unit,
     searchQuery: String = "",
     onSearchQueryChange: (String) -> Unit = {},
-    modifier: Modifier = Modifier
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
