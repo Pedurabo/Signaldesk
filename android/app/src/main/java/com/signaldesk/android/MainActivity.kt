@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
         IncidentDetailViewModelFactory(
             repository = repository,
             observableRepository = repository,
-            observableTimelineRepository = repository
+            observableTimelineRepository = repository,
+            observableSyncRepository = repository
         )
     }
 

@@ -1154,6 +1154,49 @@ class CachedIncidentRepositoryTest {
             incidents.single().severity
         )
     }
+
+    @Test
+    fun observesWhetherIncidentHasPendingMutations() = runBlocking {
+        val local = FakeIncidentDao()
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = local
+        )
+
+        assertEquals(
+            false,
+            repository.observeIncidentHasPendingMutations(
+                incidentId = 41
+            ).first()
+        )
+
+        val mutationId =
+            local.insertPendingMutation(
+                PendingIncidentMutationEntity(
+                    incidentId = 41,
+                    type = "STATUS_CHANGE",
+                    payload = "INVESTIGATING",
+                    createdAt = 1L
+                )
+            )
+
+        assertEquals(
+            true,
+            repository.observeIncidentHasPendingMutations(
+                incidentId = 41
+            ).first()
+        )
+
+        local.deletePendingMutation(mutationId)
+
+        assertEquals(
+            false,
+            repository.observeIncidentHasPendingMutations(
+                incidentId = 41
+            ).first()
+        )
+    }
 }
 
 private class FakeIncidentDao(
@@ -1163,6 +1206,8 @@ private class FakeIncidentDao(
     private val pendingMutations =
         mutableListOf<PendingIncidentMutationEntity>()
 
+    private val pendingMutationState =
+        MutableStateFlow(pendingMutations.toList())
 
     private val incidents =
         initialIncidents.associateBy { it.id }.toMutableMap()
@@ -1205,6 +1250,16 @@ private class FakeIncidentDao(
         incidentId: Long
     ): IncidentEntity? {
         return incidents[incidentId]
+    }
+
+    override fun observeHasPendingMutations(
+        incidentId: Long
+    ): Flow<Boolean> {
+        return pendingMutationState.map { mutations ->
+            mutations.any { mutation ->
+                mutation.incidentId == incidentId
+            }
+        }
     }
 
     override fun observeIncident(
@@ -1304,6 +1359,7 @@ private class FakeIncidentDao(
             (pendingMutations.maxOfOrNull { it.id } ?: 0L) + 1L
 
         pendingMutations += mutation.copy(id = id)
+        pendingMutationState.value = pendingMutations.toList()
         return id
     }
 
@@ -1316,6 +1372,7 @@ private class FakeIncidentDao(
         mutationId: Long
     ) {
         pendingMutations.removeAll { it.id == mutationId }
+        pendingMutationState.value = pendingMutations.toList()
     }
 }
 

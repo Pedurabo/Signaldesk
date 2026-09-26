@@ -9,6 +9,7 @@ import com.signaldesk.android.incident.IncidentTimelineEvent
 import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.ObservableIncidentDetailRepository
 import com.signaldesk.android.incident.data.ObservableIncidentTimelineRepository
+import com.signaldesk.android.incident.data.ObservableIncidentSyncRepository
 import com.signaldesk.android.incident.data.NetworkIncidentRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ data class IncidentDetailUiState(
     val isLoading: Boolean = false,
     val isUpdating: Boolean = false,
     val error: String? = null,
+    val hasPendingMutations: Boolean = false,
     val timeline: List<IncidentTimelineEvent> = emptyList(),
     val isTimelineLoading: Boolean = false,
     val timelineError: String? = null,
@@ -36,6 +38,7 @@ class IncidentDetailViewModel(
     private val repository: IncidentRepository = NetworkIncidentRepository(),
     private val observableRepository: ObservableIncidentDetailRepository? = null,
     private val observableTimelineRepository: ObservableIncidentTimelineRepository? = null,
+    private val observableSyncRepository: ObservableIncidentSyncRepository? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
@@ -48,6 +51,7 @@ class IncidentDetailViewModel(
 
     private var observeIncidentJob: Job? = null
     private var observeTimelineJob: Job? = null
+    private var observeSyncJob: Job? = null
 
     private fun observeTimeline(
         incidentId: Long
@@ -68,6 +72,28 @@ class IncidentDetailViewModel(
         }
     }
 
+    private fun observeSyncState(
+        incidentId: Long
+    ) {
+        val observableSyncRepository =
+            observableSyncRepository ?: return
+
+        observeSyncJob?.cancel()
+
+        observeSyncJob = viewModelScope.launch {
+            observableSyncRepository
+                .observeIncidentHasPendingMutations(
+                    incidentId = incidentId
+                )
+                .collect { hasPendingMutations ->
+                    _uiState.value =
+                        _uiState.value.copy(
+                            hasPendingMutations =
+                                hasPendingMutations
+                        )
+                }
+        }
+    }
     private fun observeIncident(
         incidentId: Long
     ) {
@@ -91,6 +117,10 @@ class IncidentDetailViewModel(
         incidentId: Long
     ) {
         observeIncident(
+            incidentId = incidentId
+        )
+
+        observeSyncState(
             incidentId = incidentId
         )
 
@@ -317,7 +347,8 @@ class IncidentDetailViewModel(
 class IncidentDetailViewModelFactory(
     private val repository: IncidentRepository,
     private val observableRepository: ObservableIncidentDetailRepository,
-    private val observableTimelineRepository: ObservableIncidentTimelineRepository
+    private val observableTimelineRepository: ObservableIncidentTimelineRepository,
+    private val observableSyncRepository: ObservableIncidentSyncRepository
 ) : ViewModelProvider.Factory {
 
     @Suppress("UNCHECKED_CAST")
@@ -332,7 +363,9 @@ class IncidentDetailViewModelFactory(
                 repository = repository,
                 observableRepository = observableRepository,
                 observableTimelineRepository =
-                    observableTimelineRepository
+                    observableTimelineRepository,
+                observableSyncRepository =
+                    observableSyncRepository
             ) as T
         }
 

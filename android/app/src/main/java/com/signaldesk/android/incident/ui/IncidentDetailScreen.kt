@@ -33,6 +33,7 @@ import com.signaldesk.android.incident.IncidentTimelineEvent
 @Composable
 fun IncidentDetailScreen(
     incident: Incident,
+    hasPendingMutations: Boolean = false,
     timeline: List<IncidentTimelineEvent>,
     isTimelineLoading: Boolean,
     timelineError: String?,
@@ -91,6 +92,13 @@ fun IncidentDetailScreen(
                 text = incident.title,
                 style = MaterialTheme.typography.headlineSmall
             )
+
+            if (hasPendingMutations) {
+                Text(
+                    text = "Pending sync",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

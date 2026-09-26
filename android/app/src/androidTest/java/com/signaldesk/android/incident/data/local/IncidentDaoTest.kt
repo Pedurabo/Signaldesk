@@ -583,4 +583,58 @@ class IncidentDaoTest {
             emissions[1].map { it.id }
         )
     }
+
+    @Test
+    fun observedPendingMutationStateChangesWhenOutboxChanges() = runBlocking {
+        val emissions = mutableListOf<Boolean>()
+
+        val initialEmissionReceived =
+            CompletableDeferred<Unit>()
+
+        val pendingEmissionReceived =
+            CompletableDeferred<Unit>()
+
+        val collectionJob =
+            launch(
+                start = CoroutineStart.UNDISPATCHED
+            ) {
+                dao.observeHasPendingMutations(
+                    incidentId = 41
+                )
+                    .onEach { hasPending ->
+                        if (emissions.isEmpty()) {
+                            initialEmissionReceived.complete(Unit)
+                        }
+
+                        if (hasPending) {
+                            pendingEmissionReceived.complete(Unit)
+                        }
+                    }
+                    .take(3)
+                    .toList(emissions)
+            }
+
+        initialEmissionReceived.await()
+
+        val mutationId =
+            dao.insertPendingMutation(
+                PendingIncidentMutationEntity(
+                    incidentId = 41,
+                    type = "STATUS_CHANGE",
+                    payload = "INVESTIGATING",
+                    createdAt = 1L
+                )
+            )
+
+        pendingEmissionReceived.await()
+
+        dao.deletePendingMutation(mutationId)
+
+        collectionJob.join()
+
+        assertEquals(
+            listOf(false, true, false),
+            emissions
+        )
+    }
 }

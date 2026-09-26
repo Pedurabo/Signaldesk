@@ -148,6 +148,8 @@ fun SignalDeskApp(
                 incident != null -> {
                     IncidentDetailScreen(
                         incident = incident,
+                        hasPendingMutations =
+                            detailUiState.hasPendingMutations,
                         timeline = detailUiState.timeline,
                         isTimelineLoading =
                             detailUiState.isTimelineLoading,

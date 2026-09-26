@@ -27,7 +27,8 @@ class CachedIncidentRepository(
 ) : IncidentRepository,
     ObservableIncidentRepository,
     ObservableIncidentDetailRepository,
-    ObservableIncidentTimelineRepository {
+    ObservableIncidentTimelineRepository,
+    ObservableIncidentSyncRepository {
     override fun observeIncidents(
         status: IncidentStatus?,
         severity: Severity?
@@ -48,6 +49,14 @@ class CachedIncidentRepository(
         ).map { entity ->
             entity?.toDomain()
         }
+    }
+
+    override fun observeIncidentHasPendingMutations(
+        incidentId: Long
+    ): Flow<Boolean> {
+        return local.observeHasPendingMutations(
+            incidentId = incidentId
+        )
     }
 
     override fun getIncidents(

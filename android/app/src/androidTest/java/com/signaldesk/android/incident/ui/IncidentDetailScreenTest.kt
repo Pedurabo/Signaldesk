@@ -1,8 +1,10 @@
 package com.signaldesk.android.incident.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -114,5 +116,73 @@ class IncidentDetailScreenTest {
                 "Expected entered note but was $addedNote"
             }
         }
+    }
+
+    @Test
+    fun pendingSyncIndicatorIsDisplayedWhenMutationIsPending() {
+        val incident = Incident(
+            id = 603,
+            title = "Offline status update",
+            description = "Status changed while offline",
+            severity = Severity.HIGH,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentDetailScreen(
+                    incident = incident,
+                    hasPendingMutations = true,
+                    timeline = emptyList(),
+                    isTimelineLoading = false,
+                    timelineError = null,
+                    isAddingNote = false,
+                    noteError = null,
+                    isUpdating = false,
+                    error = null,
+                    onAddNote = {},
+                    onStatusChange = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Pending sync")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun pendingSyncIndicatorIsAbsentWhenNothingIsPending() {
+        val incident = Incident(
+            id = 604,
+            title = "Synced incident",
+            description = "No pending mutation",
+            severity = Severity.LOW,
+            status = IncidentStatus.OPEN
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentDetailScreen(
+                    incident = incident,
+                    hasPendingMutations = false,
+                    timeline = emptyList(),
+                    isTimelineLoading = false,
+                    timelineError = null,
+                    isAddingNote = false,
+                    noteError = null,
+                    isUpdating = false,
+                    error = null,
+                    onAddNote = {},
+                    onStatusChange = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        composeRule
+            .onAllNodesWithText("Pending sync")
+            .assertCountEquals(0)
     }
 }

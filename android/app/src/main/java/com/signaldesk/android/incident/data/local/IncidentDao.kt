@@ -136,6 +136,19 @@ interface IncidentDao {
     fun getPendingMutations(): List<PendingIncidentMutationEntity>
 
     @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1
+            FROM pending_incident_mutations
+            WHERE incidentId = :incidentId
+        )
+        """
+    )
+    fun observeHasPendingMutations(
+        incidentId: Long
+    ): Flow<Boolean>
+
+    @Query(
         "DELETE FROM pending_incident_mutations WHERE id = :mutationId"
     )
     fun deletePendingMutation(

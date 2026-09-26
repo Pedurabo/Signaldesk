@@ -1,4 +1,6 @@
 package com.signaldesk.android.incident.ui
+
+import com.signaldesk.android.incident.data.ObservableIncidentSyncRepository
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -1056,8 +1058,154 @@ class IncidentDetailViewModelTest {
             viewModel.uiState.value.timeline
         )
     }
+
+    @Test
+    fun observesWhetherIncidentHasPendingMutations() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 41,
+                title = "Pending sync",
+                description = "Offline status change",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident
+                )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = incident
+                )
+
+            val observableTimelineRepository =
+                TestObservableIncidentTimelineRepository(
+                    timeline = emptyList()
+                )
+
+            val observableSyncRepository =
+                TestObservableIncidentSyncRepository()
+
+            val viewModel =
+                IncidentDetailViewModel(
+                    repository = repository,
+                    observableRepository =
+                        observableRepository,
+                    observableTimelineRepository =
+                        observableTimelineRepository,
+                    observableSyncRepository =
+                        observableSyncRepository,
+                    ioDispatcher = testDispatcher
+                )
+
+            viewModel.loadIncident(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertFalse(
+                viewModel.uiState.value.hasPendingMutations
+            )
+
+            observableSyncRepository.emit(true)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(
+                viewModel.uiState.value.hasPendingMutations
+            )
+
+            observableSyncRepository.emit(false)
+            testScheduler.advanceUntilIdle()
+
+            assertFalse(
+                viewModel.uiState.value.hasPendingMutations
+            )
+        }
+
+    @Test
+    fun clearIncidentStopsPendingSyncObservation() =
+        runTest(testDispatcher) {
+            val incident = Incident(
+                id = 42,
+                title = "Pending lifecycle",
+                description = "Verify observer cancellation",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+            val repository =
+                TestIncidentDetailRepository(
+                    incident = incident
+                )
+
+            val observableRepository =
+                TestObservableIncidentDetailRepository(
+                    incident = incident
+                )
+
+            val observableSyncRepository =
+                TestObservableIncidentSyncRepository()
+
+            val viewModel =
+                IncidentDetailViewModel(
+                    repository = repository,
+                    observableRepository =
+                        observableRepository,
+                    observableSyncRepository =
+                        observableSyncRepository,
+                    ioDispatcher = testDispatcher
+                )
+
+            viewModel.loadIncident(
+                incidentId = incident.id
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            observableSyncRepository.emit(true)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(
+                viewModel.uiState.value.hasPendingMutations
+            )
+
+            viewModel.clearIncident()
+
+            assertFalse(
+                viewModel.uiState.value.hasPendingMutations
+            )
+
+            observableSyncRepository.emit(true)
+            testScheduler.advanceUntilIdle()
+
+            assertFalse(
+                viewModel.uiState.value.hasPendingMutations
+            )
+        }
 }
 
+private class TestObservableIncidentSyncRepository(
+    pending: Boolean = false
+) : ObservableIncidentSyncRepository {
+
+    private val pendingState =
+        MutableStateFlow(pending)
+
+    override fun observeIncidentHasPendingMutations(
+        incidentId: Long
+    ): Flow<Boolean> {
+        return pendingState
+    }
+
+    fun emit(
+        pending: Boolean
+    ) {
+        pendingState.value = pending
+    }
+}
 private class TestObservableIncidentDetailRepository(
 
     incident: Incident?
