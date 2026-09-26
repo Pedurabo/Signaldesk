@@ -45,6 +45,7 @@ class IncidentListViewModel(
 
     private var loadIncidentsJob: Job? = null
     private var observeIncidentsJob: Job? = null
+    private var hasObservedCache = false
 
     init {
         observeIncidents()
@@ -65,6 +66,8 @@ class IncidentListViewModel(
                 status = status,
                 severity = severity
             ).collect { incidents ->
+                hasObservedCache = true
+
                 _uiState.value = _uiState.value.copy(
                     incidents = incidents
                 )
@@ -79,13 +82,13 @@ class IncidentListViewModel(
         loadIncidentsJob?.cancel()
 
         loadIncidentsJob = viewModelScope.launch {
-            val hasObservedIncidents =
+            val hasObservedCache =
                 observableRepository != null &&
-                    _uiState.value.incidents.isNotEmpty()
+                    this@IncidentListViewModel.hasObservedCache
 
             _uiState.value = _uiState.value.copy(
-                isLoading = !hasObservedIncidents,
-                isRefreshing = hasObservedIncidents,
+                isLoading = !hasObservedCache,
+                isRefreshing = hasObservedCache,
                 error = null
             )
 

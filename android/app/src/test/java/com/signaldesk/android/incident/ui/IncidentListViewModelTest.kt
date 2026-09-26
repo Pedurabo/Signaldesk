@@ -476,6 +476,60 @@ class IncidentListViewModelTest {
                 refreshFinished.await(5, TimeUnit.SECONDS)
             )
         }
+
+    @Test
+    fun emptyObservedCacheUsesRefreshStateWhileNetworkIsInFlight() =
+        runTest(testDispatcher) {
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = emptyList()
+                )
+
+            val refreshStarted = CountDownLatch(1)
+            val allowRefreshToFinish = CountDownLatch(1)
+            val refreshFinished = CountDownLatch(1)
+
+            val repository =
+                BlockingIncidentRepository(
+                    incident = incident(
+                        id = 402,
+                        status = IncidentStatus.OPEN
+                    ),
+                    refreshStarted = refreshStarted,
+                    allowRefreshToFinish = allowRefreshToFinish,
+                    refreshFinished = refreshFinished
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = Dispatchers.IO
+            )
+
+            testScheduler.runCurrent()
+
+            assertTrue(
+                refreshStarted.await(5, TimeUnit.SECONDS)
+            )
+
+            assertEquals(
+                emptyList<Incident>(),
+                viewModel.uiState.value.incidents
+            )
+            assertFalse(
+                viewModel.uiState.value.isLoading
+            )
+            assertTrue(
+                viewModel.uiState.value.isRefreshing
+            )
+
+            allowRefreshToFinish.countDown()
+
+            assertTrue(
+                refreshFinished.await(5, TimeUnit.SECONDS)
+            )
+        }
+
     @Test
     fun completedRefreshKeepsObservedIncidentsWithoutLoading() =
         runTest(testDispatcher) {
