@@ -1,5 +1,7 @@
 package com.signaldesk.android.incident.data
 
+import com.signaldesk.android.BuildConfig
+
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.IncidentTimelineEvent
@@ -11,7 +13,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class NetworkIncidentRepository(
-    private val baseUrl: String = "http://10.0.2.2:8082"
+    private val baseUrl: String = BuildConfig.SIGNALDESK_BASE_URL
 ) : IncidentRepository {
 
     override fun getIncidents(

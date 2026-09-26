@@ -27,6 +27,16 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val signaldeskBaseUrl =
+            providers.gradleProperty("signaldeskBaseUrl")
+                .orElse("http://10.0.2.2:8082")
+
+        buildConfigField(
+            "String",
+            "SIGNALDESK_BASE_URL",
+            "\"${signaldeskBaseUrl.get()}\""
+        )
     }
 
     buildTypes {
@@ -44,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
 }
