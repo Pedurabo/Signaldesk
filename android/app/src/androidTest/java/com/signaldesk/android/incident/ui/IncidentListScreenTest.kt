@@ -2,7 +2,7 @@ package com.signaldesk.android.incident.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -16,7 +16,7 @@ import org.junit.Test
 class IncidentListScreenTest {
 
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<com.signaldesk.android.ComposeTestActivity>()
 
     @Test
     fun incidentIsDisplayed() {
