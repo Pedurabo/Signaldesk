@@ -13,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,8 @@ fun IncidentListScreen(
     onIncidentClick: (Incident) -> Unit,
     onRefresh: () -> Unit,
     onCreateIncidentClick: () -> Unit,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -130,6 +133,18 @@ fun IncidentListScreen(
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
+                        }
+
+                        item {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = onSearchQueryChange,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("incident_search"),
+                                label = { Text("Search incidents") },
+                                singleLine = true
+                            )
                         }
 
                         item {

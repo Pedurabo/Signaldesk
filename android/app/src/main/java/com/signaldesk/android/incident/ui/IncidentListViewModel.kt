@@ -24,6 +24,7 @@ data class IncidentListUiState(
     val isRefreshing: Boolean = false,
     val selectedStatus: IncidentStatus? = null,
     val selectedSeverity: Severity? = null,
+    val searchQuery: String = "",
     val isCreatingIncident: Boolean = false,
     val createIncidentError: String? = null,
     val createdIncidentId: Long? = null,
@@ -46,6 +47,7 @@ class IncidentListViewModel(
     private var loadIncidentsJob: Job? = null
     private var observeIncidentsJob: Job? = null
     private var hasObservedCache = false
+    private var observedIncidents: List<Incident> = emptyList()
 
     init {
         observeIncidents()
@@ -67,9 +69,13 @@ class IncidentListViewModel(
                 severity = severity
             ).collect { incidents ->
                 hasObservedCache = true
+                observedIncidents = incidents
 
                 _uiState.value = _uiState.value.copy(
-                    incidents = incidents
+                    incidents = filterIncidentsForSearch(
+                        incidents = incidents,
+                        query = _uiState.value.searchQuery
+                    )
                 )
             }
         }
@@ -141,6 +147,38 @@ class IncidentListViewModel(
 
     fun refreshIncidents() {
         loadIncidents()
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(
+            searchQuery = query,
+            incidents = filterIncidentsForSearch(
+                incidents = observedIncidents,
+                query = query
+            )
+        )
+    }
+
+    private fun filterIncidentsForSearch(
+        incidents: List<Incident>,
+        query: String
+    ): List<Incident> {
+        val normalizedQuery = query.trim()
+
+        if (normalizedQuery.isEmpty()) {
+            return incidents
+        }
+
+        return incidents.filter { incident ->
+            incident.title.contains(
+                normalizedQuery,
+                ignoreCase = true
+            ) ||
+                incident.description.contains(
+                    normalizedQuery,
+                    ignoreCase = true
+                )
+        }
     }
 
     fun setStatusFilter(status: IncidentStatus?) {

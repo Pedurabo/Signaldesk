@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.swipeDown
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
@@ -302,4 +303,41 @@ class IncidentListScreenTest {
         }
     }
 
+
+    @Test
+    fun typingSearchInvokesSearchCallback() {
+        var searchQuery = ""
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = emptyList(),
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = null,
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {},
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onRefresh = {},
+                    onCreateIncidentClick = {},
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = {
+                        searchQuery = it
+                    }
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag("incident_search")
+            .performTextInput("database")
+
+        composeRule.runOnIdle {
+            assert(searchQuery == "database") {
+                "Expected database but was $searchQuery"
+            }
+        }
+    }
 }

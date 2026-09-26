@@ -688,6 +688,166 @@ class IncidentListViewModelTest {
                 repository.createRequests
             )
         }
+
+    @Test
+    fun searchQueryFiltersObservedIncidents() =
+        runTest(testDispatcher) {
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = listOf(
+                        Incident(
+                            id = 501,
+                            title = "Database outage",
+                            description = "Primary database unavailable",
+                            severity = Severity.CRITICAL,
+                            status = IncidentStatus.OPEN
+                        ),
+                        Incident(
+                            id = 502,
+                            title = "API latency",
+                            description = "Checkout DATABASE calls are slow",
+                            severity = Severity.HIGH,
+                            status = IncidentStatus.INVESTIGATING
+                        ),
+                        Incident(
+                            id = 503,
+                            title = "Certificate renewal",
+                            description = "TLS certificate expires soon",
+                            severity = Severity.LOW,
+                            status = IncidentStatus.OPEN
+                        )
+                    )
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = TestIncidentRepository(
+                    incidents = emptyList()
+                ),
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.setSearchQuery("database")
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                listOf(501L, 502L),
+                viewModel.uiState.value.incidents.map { it.id }
+            )
+
+            assertEquals(
+                "database",
+                viewModel.uiState.value.searchQuery
+            )
+        }
+
+    @Test
+    fun clearingSearchRestoresObservedIncidents() =
+        runTest(testDispatcher) {
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = listOf(
+                        Incident(
+                            id = 601,
+                            title = "Database outage",
+                            description = "Primary database unavailable",
+                            severity = Severity.CRITICAL,
+                            status = IncidentStatus.OPEN
+                        ),
+                        Incident(
+                            id = 602,
+                            title = "Certificate renewal",
+                            description = "TLS certificate expires soon",
+                            severity = Severity.LOW,
+                            status = IncidentStatus.OPEN
+                        )
+                    )
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = TestIncidentRepository(
+                    incidents = emptyList()
+                ),
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.setSearchQuery("database")
+
+            assertEquals(
+                listOf(601L),
+                viewModel.uiState.value.incidents.map { it.id }
+            )
+
+            viewModel.setSearchQuery("")
+
+            assertEquals(
+                listOf(601L, 602L),
+                viewModel.uiState.value.incidents.map { it.id }
+            )
+            assertEquals("", viewModel.uiState.value.searchQuery)
+        }
+
+    @Test
+    fun activeSearchFiltersNewObservedIncidents() =
+        runTest(testDispatcher) {
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = listOf(
+                        Incident(
+                            id = 701,
+                            title = "Database outage",
+                            description = "Primary database unavailable",
+                            severity = Severity.CRITICAL,
+                            status = IncidentStatus.OPEN
+                        )
+                    )
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = TestIncidentRepository(
+                    incidents = emptyList()
+                ),
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            viewModel.setSearchQuery("database")
+
+            observableRepository.emit(
+                listOf(
+                    Incident(
+                        id = 702,
+                        title = "API latency",
+                        description = "Database calls are slow",
+                        severity = Severity.HIGH,
+                        status = IncidentStatus.INVESTIGATING
+                    ),
+                    Incident(
+                        id = 703,
+                        title = "Certificate renewal",
+                        description = "TLS certificate expires soon",
+                        severity = Severity.LOW,
+                        status = IncidentStatus.OPEN
+                    )
+                )
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                listOf(702L),
+                viewModel.uiState.value.incidents.map { it.id }
+            )
+            assertEquals("database", viewModel.uiState.value.searchQuery)
+        }
 }
 
 private data class IncidentRequest(

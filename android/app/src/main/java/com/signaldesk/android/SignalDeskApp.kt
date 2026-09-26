@@ -71,7 +71,9 @@ fun SignalDeskApp(
                     navController.navigate(
                         CREATE_INCIDENT_ROUTE
                     )
-                }
+                },
+                searchQuery = uiState.searchQuery,
+                onSearchQueryChange = listViewModel::setSearchQuery
             )
         }
 
