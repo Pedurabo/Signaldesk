@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.signaldesk.android.incident.Incident
@@ -32,6 +33,7 @@ class IncidentListScreenTest {
                 IncidentListScreen(
                     incidents = listOf(incident),
                     isLoading = false,
+                    isRefreshing = false,
                     error = null,
                     selectedStatus = null,
                     selectedSeverity = null,
@@ -80,6 +82,7 @@ class IncidentListScreenTest {
                 IncidentListScreen(
                     incidents = listOf(incident),
                     isLoading = false,
+                    isRefreshing = false,
                     error = null,
                     selectedStatus = null,
                     selectedSeverity = null,
@@ -112,6 +115,7 @@ class IncidentListScreenTest {
                 IncidentListScreen(
                     incidents = emptyList(),
                     isLoading = false,
+                    isRefreshing = false,
                     error = null,
                     selectedStatus = null,
                     selectedSeverity = null,
@@ -139,5 +143,41 @@ class IncidentListScreenTest {
                 "Expected INVESTIGATING but was $selectedStatus"
             }
         }
+    }
+
+    @Test
+    fun refreshingKeepsCachedIncidentVisible() {
+        val incident = Incident(
+            id = 503,
+            title = "Cached checkout incident",
+            description = "Previously cached incident remains visible",
+            severity = Severity.HIGH,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = listOf(incident),
+                    isLoading = false,
+                    isRefreshing = true,
+                    error = null,
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {},
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onCreateIncidentClick = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag("incident_refresh_indicator")
+            .assertIsDisplayed()
+
+        composeRule
+            .onNodeWithText("Cached checkout incident")
+            .assertIsDisplayed()
     }
 }

@@ -16,6 +16,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -421,6 +423,109 @@ class IncidentListViewModelTest {
         }
 
     @Test
+    fun cachedIncidentsRemainVisibleWhileRefreshIsInFlight() =
+        runTest(testDispatcher) {
+            val cachedIncident = incident(
+                id = 399,
+                status = IncidentStatus.OPEN
+            )
+
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = listOf(cachedIncident)
+                )
+
+            val refreshStarted = CountDownLatch(1)
+            val allowRefreshToFinish = CountDownLatch(1)
+            val refreshFinished = CountDownLatch(1)
+
+            val repository =
+                BlockingIncidentRepository(
+                    incident = cachedIncident,
+                    refreshStarted = refreshStarted,
+                    allowRefreshToFinish = allowRefreshToFinish,
+                    refreshFinished = refreshFinished
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = repository,
+                observableRepository = observableRepository,
+                ioDispatcher = Dispatchers.IO
+            )
+
+            testScheduler.runCurrent()
+
+            assertTrue(
+                refreshStarted.await(5, TimeUnit.SECONDS)
+            )
+
+            assertEquals(
+                listOf(cachedIncident),
+                viewModel.uiState.value.incidents
+            )
+            assertFalse(
+                viewModel.uiState.value.isLoading
+            )
+            assertTrue(
+                viewModel.uiState.value.isRefreshing
+            )
+
+            allowRefreshToFinish.countDown()
+
+            assertTrue(
+                refreshFinished.await(5, TimeUnit.SECONDS)
+            )
+        }
+    @Test
+    fun completedRefreshKeepsObservedIncidentsWithoutLoading() =
+        runTest(testDispatcher) {
+            val cachedIncident = incident(
+                id = 400,
+                status = IncidentStatus.OPEN
+            )
+
+            val observableRepository =
+                TestObservableIncidentRepository(
+                    incidents = listOf(cachedIncident)
+                )
+
+            val viewModel = IncidentListViewModel(
+                repository = TestIncidentRepository(
+                    incidents = listOf(cachedIncident)
+                ),
+                observableRepository = observableRepository,
+                ioDispatcher = testDispatcher
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                listOf(cachedIncident),
+                viewModel.uiState.value.incidents
+            )
+            assertFalse(
+                viewModel.uiState.value.isLoading
+            )
+            assertFalse(
+                viewModel.uiState.value.isRefreshing
+            )
+
+            viewModel.refreshIncidents()
+
+            testScheduler.advanceUntilIdle()
+
+            assertEquals(
+                listOf(cachedIncident),
+                viewModel.uiState.value.incidents
+            )
+            assertFalse(
+                viewModel.uiState.value.isLoading
+            )
+            assertFalse(
+                viewModel.uiState.value.isRefreshing
+            )
+        }
+    @Test
     fun refreshFailureKeepsObservedIncidents() =
         runTest(testDispatcher) {
             val cachedIncident = incident(
@@ -559,6 +664,62 @@ private class TestObservableIncidentRepository(
     fun emit(incidents: List<Incident>) {
         incidentState.value = incidents
     }
+}
+private class BlockingIncidentRepository(
+    private val incident: Incident,
+    private val refreshStarted: CountDownLatch,
+    private val allowRefreshToFinish: CountDownLatch,
+    private val refreshFinished: CountDownLatch
+) : IncidentRepository {
+
+    override fun getIncidents(
+        status: IncidentStatus?,
+        severity: Severity?
+    ): List<Incident> {
+        refreshStarted.countDown()
+
+        check(
+            allowRefreshToFinish.await(
+                5,
+                TimeUnit.SECONDS
+            )
+        ) {
+            "Timed out waiting to finish refresh"
+        }
+
+        refreshFinished.countDown()
+
+        return listOf(incident)
+    }
+
+    override fun getIncident(
+        incidentId: Long
+    ): Incident =
+        error("Not used by this test")
+
+    override fun createIncident(
+        title: String,
+        description: String,
+        severity: Severity
+    ): Incident =
+        error("Not used by this test")
+
+    override fun getIncidentTimeline(
+        incidentId: Long
+    ): List<IncidentTimelineEvent> =
+        error("Not used by this test")
+
+    override fun addIncidentNote(
+        incidentId: Long,
+        message: String
+    ): IncidentTimelineEvent =
+        error("Not used by this test")
+
+    override fun updateIncidentStatus(
+        incidentId: Long,
+        status: IncidentStatus
+    ): Incident =
+        error("Not used by this test")
 }
 private class TestIncidentRepository(
     private val incidents: List<Incident>,

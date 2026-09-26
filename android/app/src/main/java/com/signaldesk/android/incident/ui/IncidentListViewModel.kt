@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 data class IncidentListUiState(
     val incidents: List<Incident> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val selectedStatus: IncidentStatus? = null,
     val selectedSeverity: Severity? = null,
     val isCreatingIncident: Boolean = false,
@@ -78,8 +79,13 @@ class IncidentListViewModel(
         loadIncidentsJob?.cancel()
 
         loadIncidentsJob = viewModelScope.launch {
+            val hasObservedIncidents =
+                observableRepository != null &&
+                    _uiState.value.incidents.isNotEmpty()
+
             _uiState.value = _uiState.value.copy(
-                isLoading = true,
+                isLoading = !hasObservedIncidents,
+                isRefreshing = hasObservedIncidents,
                 error = null
             )
 
@@ -96,11 +102,13 @@ class IncidentListViewModel(
                         _uiState.value.copy(
                             incidents = incidents,
                             isLoading = false,
+                            isRefreshing = false,
                             error = null
                         )
                     } else {
                         _uiState.value.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             error = null
                         )
                     }
@@ -112,12 +120,14 @@ class IncidentListViewModel(
                         _uiState.value.copy(
                             incidents = emptyList(),
                             isLoading = false,
+                            isRefreshing = false,
                             error = exception.message
                                 ?: "Unable to load incidents"
                         )
                     } else {
                         _uiState.value.copy(
                             isLoading = false,
+                            isRefreshing = false,
                             error = exception.message
                                 ?: "Unable to load incidents"
                         )

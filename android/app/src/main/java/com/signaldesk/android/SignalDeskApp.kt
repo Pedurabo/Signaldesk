@@ -55,6 +55,7 @@ fun SignalDeskApp(
             IncidentListScreen(
                 incidents = uiState.incidents,
                 isLoading = uiState.isLoading,
+                isRefreshing = uiState.isRefreshing,
                 error = uiState.error,
                 selectedStatus = uiState.selectedStatus,
                 selectedSeverity = uiState.selectedSeverity,
