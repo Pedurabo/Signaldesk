@@ -45,7 +45,8 @@ class SignalDeskDatabaseMigrationTest {
                 databaseName
             )
                 .addMigrations(
-                    SignalDeskDatabase.MIGRATION_2_3
+                    SignalDeskDatabase.MIGRATION_2_3,
+                    SignalDeskDatabase.MIGRATION_3_4
                 )
                 .allowMainThreadQueries()
                 .build()
@@ -109,6 +110,138 @@ class SignalDeskDatabaseMigrationTest {
         }
     }
 
+
+    @Test
+    fun migration3To4PreservesPendingMutationAndAddsRetryMetadata() {
+        createVersion3Database()
+
+        val database =
+            Room.databaseBuilder(
+                context,
+                SignalDeskDatabase::class.java,
+                databaseName
+            )
+                .addMigrations(
+                    SignalDeskDatabase.MIGRATION_3_4
+                )
+                .allowMainThreadQueries()
+                .build()
+
+        try {
+            val mutation =
+                database.incidentDao()
+                    .getPendingMutations()
+                    .single()
+
+            assertEquals(41, mutation.incidentId)
+            assertEquals(
+                "STATUS_CHANGE",
+                mutation.type
+            )
+            assertEquals(
+                "RESOLVED",
+                mutation.payload
+            )
+            assertEquals(
+                0,
+                mutation.attemptCount
+            )
+            assertEquals(
+                null,
+                mutation.lastAttemptAt
+            )
+            assertEquals(
+                null,
+                mutation.lastError
+            )
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun createVersion3Database() {
+        val configuration =
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration
+                .builder(context)
+                .name(databaseName)
+                .callback(
+                    object :
+                        androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(3) {
+
+                        override fun onCreate(
+                            db: SupportSQLiteDatabase
+                        ) {
+                            db.execSQL(
+                                """
+                                CREATE TABLE IF NOT EXISTS incidents (
+                                    id INTEGER NOT NULL,
+                                    title TEXT NOT NULL,
+                                    description TEXT NOT NULL,
+                                    severity TEXT NOT NULL,
+                                    status TEXT NOT NULL,
+                                    PRIMARY KEY(id)
+                                )
+                                """.trimIndent()
+                            )
+
+                            db.execSQL(
+                                """
+                                CREATE TABLE IF NOT EXISTS incident_timeline_events (
+                                    id INTEGER NOT NULL,
+                                    incidentId INTEGER NOT NULL,
+                                    type TEXT NOT NULL,
+                                    message TEXT NOT NULL,
+                                    createdAt TEXT NOT NULL,
+                                    PRIMARY KEY(id)
+                                )
+                                """.trimIndent()
+                            )
+
+                            db.execSQL(
+                                """
+                                CREATE TABLE IF NOT EXISTS pending_incident_mutations (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                                    incidentId INTEGER NOT NULL,
+                                    type TEXT NOT NULL,
+                                    payload TEXT NOT NULL,
+                                    createdAt INTEGER NOT NULL
+                                )
+                                """.trimIndent()
+                            )
+
+                            db.execSQL(
+                                """
+                                INSERT INTO pending_incident_mutations (
+                                    incidentId,
+                                    type,
+                                    payload,
+                                    createdAt
+                                ) VALUES (
+                                    41,
+                                    'STATUS_CHANGE',
+                                    'RESOLVED',
+                                    123456789
+                                )
+                                """.trimIndent()
+                            )
+                        }
+
+                        override fun onUpgrade(
+                            db: SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int
+                        ) = Unit
+                    }
+                )
+                .build()
+
+        val helper =
+            FrameworkSQLiteOpenHelperFactory()
+                .create(configuration)
+
+        helper.writableDatabase.close()
+        helper.close()
+    }
     private fun createVersion2Database() {
         val configuration =
             androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration
