@@ -1,10 +1,22 @@
-package com.signaldesk.android.incident.sync
+﻿package com.signaldesk.android.incident.sync
 
 import android.content.Context
+import androidx.work.ListenableWorker
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.signaldesk.android.SignalDeskApplication
 import com.signaldesk.android.incident.data.PendingMutationSyncResult
+
+internal fun pendingMutationSyncResultToWorkResult(
+    result: PendingMutationSyncResult
+): ListenableWorker.Result =
+    when (result) {
+        PendingMutationSyncResult.COMPLETED ->
+            ListenableWorker.Result.success()
+
+        PendingMutationSyncResult.RETRY_NEEDED ->
+            ListenableWorker.Result.retry()
+    }
 
 class IncidentSyncWorker(
     appContext: Context,
@@ -15,15 +27,9 @@ class IncidentSyncWorker(
         val application =
             applicationContext as SignalDeskApplication
 
-        return when (
+        return pendingMutationSyncResultToWorkResult(
             application.incidentRepository
                 .syncPendingMutations()
-        ) {
-            PendingMutationSyncResult.COMPLETED ->
-                Result.success()
-
-            PendingMutationSyncResult.RETRY_NEEDED ->
-                Result.retry()
-        }
+        )
     }
 }
