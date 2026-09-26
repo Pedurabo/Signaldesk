@@ -1,4 +1,8 @@
 package com.signaldesk.android.incident.ui
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertNull
+import kotlinx.coroutines.test.advanceUntilIdle
+import com.signaldesk.android.incident.IncidentTimelineEventType
 
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
@@ -873,9 +877,88 @@ class IncidentDetailViewModelTest {
                 viewModel.uiState.value.incident
             )
         }
+
+    @Test
+    fun clearIncidentStopsObservedStateFromReappearing() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+
+        val initialIncident = Incident(
+            id = 801,
+            title = "Initial incident",
+            description = "Initial description",
+            severity = Severity.HIGH,
+            status = IncidentStatus.OPEN
+        )
+
+        val laterIncident = Incident(
+            id = 801,
+            title = "Should not reappear",
+            description = "Collector should be cancelled",
+            severity = Severity.CRITICAL,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        val initialTimeline = listOf(
+            IncidentTimelineEvent(
+                id = 1001,
+                type = IncidentTimelineEventType.CREATED,
+                message = "Incident created",
+                createdAt = "2026-09-26T00:00:00Z"
+            )
+        )
+
+        val laterTimeline = listOf(
+            IncidentTimelineEvent(
+                id = 1002,
+                type = IncidentTimelineEventType.NOTE_ADDED,
+                message = "Should not reappear",
+                createdAt = "2026-09-26T00:01:00Z"
+            )
+        )
+
+        val repository = TestIncidentDetailRepository(
+            incident = initialIncident,
+            timeline = initialTimeline
+        )
+
+        val observableRepository =
+            TestObservableIncidentDetailRepository(
+                incident = initialIncident
+            )
+
+        val observableTimelineRepository =
+            TestObservableIncidentTimelineRepository(
+                timeline = initialTimeline
+            )
+
+        val viewModel = IncidentDetailViewModel(
+            repository = repository,
+            observableRepository = observableRepository,
+            observableTimelineRepository =
+                observableTimelineRepository,
+            ioDispatcher = testDispatcher
+        )
+
+        viewModel.loadIncident(801)
+        viewModel.loadIncidentTimeline(801)
+        advanceUntilIdle()
+
+        viewModel.clearIncident()
+
+        assertNull(viewModel.uiState.value.incident)
+        assertTrue(viewModel.uiState.value.timeline.isEmpty())
+
+        observableRepository.emit(laterIncident)
+        observableTimelineRepository.emit(laterTimeline)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.incident)
+        assertTrue(viewModel.uiState.value.timeline.isEmpty())
+    }
 }
 
 private class TestObservableIncidentDetailRepository(
+
     incident: Incident?
 ) : ObservableIncidentDetailRepository {
 

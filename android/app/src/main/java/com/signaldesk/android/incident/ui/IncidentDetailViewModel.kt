@@ -307,6 +307,9 @@ class IncidentDetailViewModel(
         }
     }
     fun clearIncident() {
+        observeIncidentJob?.cancel()
+        observeTimelineJob?.cancel()
+
         _uiState.value = IncidentDetailUiState()
     }
 }
