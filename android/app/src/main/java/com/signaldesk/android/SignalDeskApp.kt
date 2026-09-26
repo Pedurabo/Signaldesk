@@ -150,6 +150,10 @@ fun SignalDeskApp(
                         incident = incident,
                         hasPendingMutations =
                             detailUiState.hasPendingMutations,
+                        syncAttemptCount =
+                            detailUiState.syncAttemptCount,
+                        lastSyncError =
+                            detailUiState.lastSyncError,
                         timeline = detailUiState.timeline,
                         isTimelineLoading =
                             detailUiState.isTimelineLoading,

@@ -185,4 +185,46 @@ class IncidentDetailScreenTest {
             .onAllNodesWithText("Pending sync")
             .assertCountEquals(0)
     }
+
+    @Test
+    fun failedPendingSyncDisplaysRetryDetails() {
+        val incident = Incident(
+            id = 605,
+            title = "Failed offline sync",
+            description = "Pending status update could not sync",
+            severity = Severity.HIGH,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentDetailScreen(
+                    incident = incident,
+                    hasPendingMutations = true,
+                    syncAttemptCount = 2,
+                    lastSyncError = "offline",
+                    timeline = emptyList(),
+                    isTimelineLoading = false,
+                    timelineError = null,
+                    isAddingNote = false,
+                    noteError = null,
+                    isUpdating = false,
+                    error = null,
+                    onAddNote = {},
+                    onStatusChange = {},
+                    onBack = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Pending sync")
+            .assertIsDisplayed()
+
+        composeRule
+            .onNodeWithText(
+                "Sync retry failed (2 attempts): offline"
+            )
+            .assertIsDisplayed()
+    }
 }

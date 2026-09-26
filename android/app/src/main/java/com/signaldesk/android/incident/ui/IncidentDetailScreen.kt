@@ -34,6 +34,8 @@ import com.signaldesk.android.incident.IncidentTimelineEvent
 fun IncidentDetailScreen(
     incident: Incident,
     hasPendingMutations: Boolean = false,
+    syncAttemptCount: Int = 0,
+    lastSyncError: String? = null,
     timeline: List<IncidentTimelineEvent>,
     isTimelineLoading: Boolean,
     timelineError: String?,
@@ -98,6 +100,22 @@ fun IncidentDetailScreen(
                     text = "Pending sync",
                     style = MaterialTheme.typography.labelLarge
                 )
+            if (
+                syncAttemptCount > 0 &&
+                lastSyncError != null
+            ) {
+                Text(
+                    text =
+                        "Sync retry failed " +
+                            "($syncAttemptCount " +
+                            if (syncAttemptCount == 1) {
+                                "attempt): $lastSyncError"
+                            } else {
+                                "attempts): $lastSyncError"
+                            },
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             }
 
             Row(
