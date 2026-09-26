@@ -1,5 +1,9 @@
 package com.signaldesk.android.incident.data.local
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import android.content.Context
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -158,6 +162,93 @@ class SignalDeskDatabaseMigrationTest {
             database.close()
         }
     }
+
+    @Test
+    fun pendingMutationObserverEmitsUpdatedRetryMetadata() =
+        runBlocking {
+            val database =
+                Room.databaseBuilder(
+                    context,
+                    SignalDeskDatabase::class.java,
+                    databaseName
+                )
+                    .allowMainThreadQueries()
+                    .build()
+
+            try {
+                val dao =
+                    database.incidentDao()
+
+                val mutationId =
+                    dao.insertPendingMutation(
+                        PendingIncidentMutationEntity(
+                            incidentId = 41,
+                            type = "STATUS_CHANGE",
+                            payload = "RESOLVED",
+                            createdAt = 123456789L
+                        )
+                    )
+
+                val initial =
+                    dao.observePendingMutationsForIncident(
+                        incidentId = 41
+                    )
+                        .first()
+                        .single()
+
+                assertEquals(
+                    0,
+                    initial.attemptCount
+                )
+                assertEquals(
+                    null,
+                    initial.lastAttemptAt
+                )
+                assertEquals(
+                    null,
+                    initial.lastError
+                )
+
+                val retriedDeferred =
+                    async(
+                        start = CoroutineStart.UNDISPATCHED
+                    ) {
+                        dao.observePendingMutationsForIncident(
+                            incidentId = 41
+                        )
+                            .first { mutations ->
+                                mutations
+                                    .singleOrNull()
+                                    ?.attemptCount == 1
+                            }
+                            .single()
+                    }
+
+                dao.recordPendingMutationFailure(
+                    mutationId = mutationId,
+                    attemptedAt = 987654321L,
+                    error = "offline"
+                )
+
+                val retried =
+                    retriedDeferred.await()
+
+                assertEquals(
+                    1,
+                    retried.attemptCount
+                )
+                assertEquals(
+                    987654321L,
+                    retried.lastAttemptAt
+                )
+                assertEquals(
+                    "offline",
+                    retried.lastError
+                )
+            } finally {
+                database.close()
+            }
+        }
 
     private fun createVersion3Database() {
         val configuration =

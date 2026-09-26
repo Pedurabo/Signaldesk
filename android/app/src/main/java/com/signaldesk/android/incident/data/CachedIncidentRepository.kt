@@ -51,6 +51,27 @@ class CachedIncidentRepository(
         }
     }
 
+    override fun observeIncidentSyncState(
+        incidentId: Long
+    ): Flow<IncidentSyncState> {
+        return local.observePendingMutationsForIncident(
+            incidentId = incidentId
+        ).map { mutations ->
+            val latestMutation =
+                mutations.lastOrNull()
+
+            IncidentSyncState(
+                hasPendingMutations = mutations.isNotEmpty(),
+                attemptCount =
+                    latestMutation?.attemptCount ?: 0,
+                lastAttemptAt =
+                    latestMutation?.lastAttemptAt,
+                lastError =
+                    latestMutation?.lastError
+            )
+        }
+    }
+
     override fun observeIncidentHasPendingMutations(
         incidentId: Long
     ): Flow<Boolean> {

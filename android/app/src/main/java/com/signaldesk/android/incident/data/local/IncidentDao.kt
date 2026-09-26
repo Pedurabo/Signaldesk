@@ -137,6 +137,17 @@ interface IncidentDao {
 
     @Query(
         """
+        SELECT * FROM pending_incident_mutations
+        WHERE incidentId = :incidentId
+        ORDER BY id ASC
+        """
+    )
+    fun observePendingMutationsForIncident(
+        incidentId: Long
+    ): Flow<List<PendingIncidentMutationEntity>>
+
+    @Query(
+        """
         SELECT EXISTS(
             SELECT 1
             FROM pending_incident_mutations

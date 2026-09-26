@@ -27,6 +27,9 @@ data class IncidentDetailUiState(
     val isUpdating: Boolean = false,
     val error: String? = null,
     val hasPendingMutations: Boolean = false,
+    val syncAttemptCount: Int = 0,
+    val lastSyncAttemptAt: Long? = null,
+    val lastSyncError: String? = null,
     val timeline: List<IncidentTimelineEvent> = emptyList(),
     val isTimelineLoading: Boolean = false,
     val timelineError: String? = null,
@@ -82,18 +85,25 @@ class IncidentDetailViewModel(
 
         observeSyncJob = viewModelScope.launch {
             observableSyncRepository
-                .observeIncidentHasPendingMutations(
+                .observeIncidentSyncState(
                     incidentId = incidentId
                 )
-                .collect { hasPendingMutations ->
+                .collect { syncState ->
                     _uiState.value =
                         _uiState.value.copy(
                             hasPendingMutations =
-                                hasPendingMutations
+                                syncState.hasPendingMutations,
+                            syncAttemptCount =
+                                syncState.attemptCount,
+                            lastSyncAttemptAt =
+                                syncState.lastAttemptAt,
+                            lastSyncError =
+                                syncState.lastError
                         )
                 }
         }
     }
+
     private fun observeIncident(
         incidentId: Long
     ) {
@@ -339,6 +349,7 @@ class IncidentDetailViewModel(
     fun clearIncident() {
         observeIncidentJob?.cancel()
         observeTimelineJob?.cancel()
+        observeSyncJob?.cancel()
 
         _uiState.value = IncidentDetailUiState()
     }

@@ -1,5 +1,6 @@
 package com.signaldesk.android.incident.ui
 
+import com.signaldesk.android.incident.data.IncidentSyncState
 import com.signaldesk.android.incident.data.ObservableIncidentSyncRepository
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
@@ -14,6 +15,7 @@ import com.signaldesk.android.incident.data.IncidentRepository
 import com.signaldesk.android.incident.data.ObservableIncidentDetailRepository
 import com.signaldesk.android.incident.data.ObservableIncidentTimelineRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -1165,45 +1167,188 @@ class IncidentDetailViewModelTest {
 
             testScheduler.advanceUntilIdle()
 
-            observableSyncRepository.emit(true)
+            observableSyncRepository.emit(
+                IncidentSyncState(
+                    hasPendingMutations = true,
+                    attemptCount = 2,
+                    lastAttemptAt = 1234L,
+                    lastError = "offline"
+                )
+            )
+
             testScheduler.advanceUntilIdle()
 
             assertTrue(
                 viewModel.uiState.value.hasPendingMutations
             )
 
-            viewModel.clearIncident()
-
-            assertFalse(
-                viewModel.uiState.value.hasPendingMutations
+            assertEquals(
+                2,
+                viewModel.uiState.value.syncAttemptCount
             )
 
-            observableSyncRepository.emit(true)
+            viewModel.clearIncident()
+
             testScheduler.advanceUntilIdle()
 
             assertFalse(
                 viewModel.uiState.value.hasPendingMutations
             )
-        }
-}
 
+            assertEquals(
+                0,
+                viewModel.uiState.value.syncAttemptCount
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.lastSyncAttemptAt
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.lastSyncError
+            )
+
+            observableSyncRepository.emit(
+                IncidentSyncState(
+                    hasPendingMutations = true,
+                    attemptCount = 3,
+                    lastAttemptAt = 5678L,
+                    lastError = "still offline"
+                )
+            )
+
+            testScheduler.advanceUntilIdle()
+
+            assertFalse(
+                viewModel.uiState.value.hasPendingMutations
+            )
+
+            assertEquals(
+                0,
+                viewModel.uiState.value.syncAttemptCount
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.lastSyncAttemptAt
+            )
+
+            assertEquals(
+                null,
+                viewModel.uiState.value.lastSyncError
+            )
+        }
+    @Test
+    fun observedSyncRetryMetadataUpdatesUiState() = runTest {
+        val testDispatcher =
+            StandardTestDispatcher(testScheduler)
+
+        val incident =
+            Incident(
+                id = 42,
+                title = "Retry metadata",
+                description = "Verify retry metadata observation",
+                severity = Severity.HIGH,
+                status = IncidentStatus.OPEN
+            )
+
+        val observableSyncRepository =
+            TestObservableIncidentSyncRepository()
+
+        val viewModel =
+            IncidentDetailViewModel(
+                repository =
+                    TestIncidentDetailRepository(
+                        incident = incident
+                    ),
+                observableSyncRepository =
+                    observableSyncRepository,
+                ioDispatcher = testDispatcher
+            )
+
+        viewModel.loadIncident(
+            incidentId = incident.id
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        observableSyncRepository.emit(
+            IncidentSyncState(
+                hasPendingMutations = true,
+                attemptCount = 2,
+                lastAttemptAt = 1234L,
+                lastError = "offline"
+            )
+        )
+
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(
+            viewModel.uiState.value.hasPendingMutations
+        )
+
+        assertEquals(
+            2,
+            viewModel.uiState.value.syncAttemptCount
+        )
+
+        assertEquals(
+            1234L,
+            viewModel.uiState.value.lastSyncAttemptAt
+        )
+
+        assertEquals(
+            "offline",
+            viewModel.uiState.value.lastSyncError
+        )
+    }
+}
 private class TestObservableIncidentSyncRepository(
     pending: Boolean = false
 ) : ObservableIncidentSyncRepository {
 
-    private val pendingState =
-        MutableStateFlow(pending)
+    private val syncState =
+        MutableStateFlow(
+            IncidentSyncState(
+                hasPendingMutations = pending,
+                attemptCount = 0,
+                lastAttemptAt = null,
+                lastError = null
+            )
+        )
+
+    override fun observeIncidentSyncState(
+        incidentId: Long
+    ): Flow<IncidentSyncState> {
+        return syncState
+    }
 
     override fun observeIncidentHasPendingMutations(
         incidentId: Long
     ): Flow<Boolean> {
-        return pendingState
+        return syncState.map { state ->
+            state.hasPendingMutations
+        }
     }
 
     fun emit(
         pending: Boolean
     ) {
-        pendingState.value = pending
+        syncState.value =
+            IncidentSyncState(
+                hasPendingMutations = pending,
+                attemptCount = 0,
+                lastAttemptAt = null,
+                lastError = null
+            )
+    }
+
+    fun emit(
+        state: IncidentSyncState
+    ) {
+        syncState.value = state
     }
 }
 private class TestObservableIncidentDetailRepository(

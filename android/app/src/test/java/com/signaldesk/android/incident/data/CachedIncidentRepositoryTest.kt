@@ -1408,6 +1408,86 @@ class CachedIncidentRepositoryTest {
             ).first()
         )
     }
+
+    @Test
+    fun emptyIncidentSyncStateHasNoRetryMetadata() = runBlocking {
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = FakeIncidentDao()
+        )
+
+        val syncState =
+            repository.observeIncidentSyncState(
+                incidentId = 41
+            ).first()
+
+        assertEquals(
+            false,
+            syncState.hasPendingMutations
+        )
+
+        assertEquals(
+            0,
+            syncState.attemptCount
+        )
+
+        assertEquals(
+            null,
+            syncState.lastAttemptAt
+        )
+
+        assertEquals(
+            null,
+            syncState.lastError
+        )
+    }
+
+    @Test
+    fun observesIncidentSyncRetryMetadata() = runBlocking {
+        val local = FakeIncidentDao()
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(),
+            local = local
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L,
+                attemptCount = 2,
+                lastAttemptAt = 1234L,
+                lastError = "offline"
+            )
+        )
+
+        val syncState =
+            repository.observeIncidentSyncState(
+                incidentId = 41
+            ).first()
+
+        assertEquals(
+            true,
+            syncState.hasPendingMutations
+        )
+
+        assertEquals(
+            2,
+            syncState.attemptCount
+        )
+
+        assertEquals(
+            1234L,
+            syncState.lastAttemptAt
+        )
+
+        assertEquals(
+            "offline",
+            syncState.lastError
+        )
+    }
 }
 
 private class FakeIncidentDao(
@@ -1461,6 +1541,20 @@ private class FakeIncidentDao(
         incidentId: Long
     ): IncidentEntity? {
         return incidents[incidentId]
+    }
+
+    override fun observePendingMutationsForIncident(
+        incidentId: Long
+    ): Flow<List<PendingIncidentMutationEntity>> {
+        return pendingMutationState.map { mutations ->
+            mutations
+                .filter { mutation ->
+                    mutation.incidentId == incidentId
+                }
+                .sortedBy { mutation ->
+                    mutation.id
+                }
+        }
     }
 
     override fun observeHasPendingMutations(
