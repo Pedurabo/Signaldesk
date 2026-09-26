@@ -28,20 +28,38 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        val signaldeskBaseUrl =
-            providers.gradleProperty("signaldeskBaseUrl")
-                .orElse("http://127.0.0.1:8082")
 
-        buildConfigField(
-            "String",
-            "SIGNALDESK_BASE_URL",
-            "\"${signaldeskBaseUrl.get()}\""
-        )
     }
 
     buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "SIGNALDESK_BASE_URL",
+                "\"http://127.0.0.1:8082\""
+            )
+        }
+
         release {
+            val signaldeskBaseUrl =
+                providers.gradleProperty("signaldeskBaseUrl")
+                    .orNull
+                    ?: throw GradleException(
+                        "Release builds require -PsignaldeskBaseUrl=https://..."
+                    )
+
+            require(signaldeskBaseUrl.startsWith("https://")) {
+                "Release signaldeskBaseUrl must use HTTPS."
+            }
+
+            buildConfigField(
+                "String",
+                "SIGNALDESK_BASE_URL",
+                "\"$signaldeskBaseUrl\""
+            )
+
             isMinifyEnabled = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
