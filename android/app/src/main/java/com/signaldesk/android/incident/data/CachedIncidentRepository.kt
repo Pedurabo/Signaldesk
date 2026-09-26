@@ -1,4 +1,6 @@
 package com.signaldesk.android.incident.data
+import com.signaldesk.android.incident.sync.IncidentSyncScheduling
+import com.signaldesk.android.incident.sync.NoOpIncidentSyncScheduler
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -13,9 +15,15 @@ import com.signaldesk.android.incident.data.local.toDomain
 import com.signaldesk.android.incident.data.local.toEntity
 import com.signaldesk.android.incident.data.local.PendingIncidentMutationEntity
 
+enum class PendingMutationSyncResult {
+    COMPLETED,
+    RETRY_NEEDED
+}
+
 class CachedIncidentRepository(
     private val remote: IncidentRepository,
-    private val local: IncidentDao
+    private val local: IncidentDao,
+    private val syncScheduler: IncidentSyncScheduling = NoOpIncidentSyncScheduler
 ) : IncidentRepository,
     ObservableIncidentRepository,
     ObservableIncidentDetailRepository,
@@ -232,11 +240,13 @@ class CachedIncidentRepository(
                 )
             )
 
+            syncScheduler.schedule()
+
             updatedIncident
         }
     }
 
-    fun syncPendingMutations() {
+    fun syncPendingMutations(): PendingMutationSyncResult {
         val mutations = local.getPendingMutations()
 
         for (mutation in mutations) {
@@ -265,8 +275,10 @@ class CachedIncidentRepository(
                 }
 
                 // Keep the mutation queued for a later retry.
-                break
+                return PendingMutationSyncResult.RETRY_NEEDED
             }
         }
+
+        return PendingMutationSyncResult.COMPLETED
     }
 }

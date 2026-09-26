@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import com.signaldesk.android.incident.data.local.PendingIncidentMutationEntity
+import com.signaldesk.android.incident.sync.IncidentSyncScheduling
 
 class CachedIncidentRepositoryTest {
 
@@ -617,7 +618,13 @@ class CachedIncidentRepositoryTest {
         val repository =
             CachedIncidentRepository(remote, local)
 
-        repository.syncPendingMutations()
+        val result =
+            repository.syncPendingMutations()
+
+        assertEquals(
+            PendingMutationSyncResult.COMPLETED,
+            result
+        )
 
         assertEquals(
             0,
@@ -657,7 +664,13 @@ class CachedIncidentRepositoryTest {
             local = local
         )
 
-        repository.syncPendingMutations()
+        val result =
+            repository.syncPendingMutations()
+
+        assertEquals(
+            PendingMutationSyncResult.RETRY_NEEDED,
+            result
+        )
 
         val mutations = local.getPendingMutations()
 
@@ -886,6 +899,38 @@ class CachedIncidentRepositoryTest {
             IncidentStatus.INVESTIGATING,
             incidents.single().status
         )
+    }
+
+    @Test
+    fun offlineStatusUpdateSchedulesBackgroundSync() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.OPEN
+                ).toEntity()
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            statusUpdateError =
+                IllegalStateException("offline")
+        )
+
+        val scheduler = FakeIncidentSyncScheduler()
+
+        val repository = CachedIncidentRepository(
+            remote = remote,
+            local = local,
+            syncScheduler = scheduler
+        )
+
+        repository.updateIncidentStatus(
+            incidentId = 41,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        assertEquals(1, scheduler.scheduleCalls)
     }
 
     private fun incident(
@@ -1271,6 +1316,17 @@ private class FakeIncidentDao(
         mutationId: Long
     ) {
         pendingMutations.removeAll { it.id == mutationId }
+    }
+}
+
+private class FakeIncidentSyncScheduler :
+    IncidentSyncScheduling {
+
+    var scheduleCalls = 0
+        private set
+
+    override fun schedule() {
+        scheduleCalls++
     }
 }
 

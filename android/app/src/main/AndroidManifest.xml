@@ -4,7 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <application android:usesCleartextTraffic="true"
+    <application
+        android:name=".SignalDeskApplication"
+        android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
