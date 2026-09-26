@@ -19,6 +19,7 @@ import com.signaldesk.android.incident.data.local.toEntity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import com.signaldesk.android.incident.data.local.PendingIncidentMutationEntity
 
 class CachedIncidentRepositoryTest {
 
@@ -428,6 +429,465 @@ class CachedIncidentRepositoryTest {
         )
     }
 
+    @Test
+    fun offlineStatusUpdateIsWrittenToLocalCache() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.OPEN
+                ).toEntity()
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                statusUpdateError =
+                    IllegalStateException("offline")
+            ),
+            local = local
+        )
+
+        repository.updateIncidentStatus(
+            incidentId = 41,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun offlineStatusUpdateQueuesPendingMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.OPEN
+                ).toEntity()
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                statusUpdateError =
+                    IllegalStateException("offline")
+            ),
+            local = local
+        )
+
+        repository.updateIncidentStatus(
+            incidentId = 41,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        val mutations =
+            local.getPendingMutations()
+
+        assertEquals(1, mutations.size)
+        assertEquals(41, mutations.single().incidentId)
+        assertEquals(
+            "STATUS_CHANGE",
+            mutations.single().type
+        )
+        assertEquals(
+            "INVESTIGATING",
+            mutations.single().payload
+        )
+    }
+
+    @Test
+    fun refreshPreservesPendingStatusMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            incidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.OPEN
+                )
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        repository.getIncidents()
+
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun refreshUsesLatestPendingStatusMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.RESOLVED
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "RESOLVED",
+                createdAt = 2L
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                incidents = listOf(
+                    incident(
+                        id = 41,
+                        status = IncidentStatus.OPEN
+                    )
+                )
+            ),
+            local = local
+        )
+
+        repository.getIncidents()
+
+        assertEquals(
+            "RESOLVED",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun successfulSyncRemovesPendingStatusMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            updatedIncident = incident(
+                id = 41,
+                status = IncidentStatus.INVESTIGATING
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        repository.syncPendingMutations()
+
+        assertEquals(
+            0,
+            local.getPendingMutations().size
+        )
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun failedSyncKeepsPendingStatusMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                statusUpdateError =
+                    IllegalStateException("offline")
+            ),
+            local = local
+        )
+
+        repository.syncPendingMutations()
+
+        val mutations = local.getPendingMutations()
+
+        assertEquals(1, mutations.size)
+        assertEquals(41, mutations.single().incidentId)
+        assertEquals(
+            "STATUS_CHANGE",
+            mutations.single().type
+        )
+        assertEquals(
+            "INVESTIGATING",
+            mutations.single().payload
+        )
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun syncReplaysStatusMutationsInOrder() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.RESOLVED
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "RESOLVED",
+                createdAt = 2L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            updatedIncident = incident(
+                id = 41,
+                status = IncidentStatus.RESOLVED
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        repository.syncPendingMutations()
+
+        assertEquals(
+            listOf(
+                41L to IncidentStatus.INVESTIGATING,
+                41L to IncidentStatus.RESOLVED
+            ),
+            remote.statusUpdateCalls
+        )
+        assertEquals(
+            0,
+            local.getPendingMutations().size
+        )
+        assertEquals(
+            "RESOLVED",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun syncStopsAfterFirstFailedMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.RESOLVED
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "RESOLVED",
+                createdAt = 2L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            statusUpdateError =
+                IllegalStateException("offline")
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        repository.syncPendingMutations()
+
+        assertEquals(
+            listOf(
+                41L to IncidentStatus.INVESTIGATING
+            ),
+            remote.statusUpdateCalls
+        )
+        assertEquals(
+            2,
+            local.getPendingMutations().size
+        )
+        assertEquals(
+            "RESOLVED",
+            local.getIncident(41)?.status
+        )
+    }
+
+    @Test
+    fun refreshSyncsPendingMutationsBeforeRemoteFetch() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            incidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                )
+            ),
+            updatedIncident = incident(
+                id = 41,
+                status = IncidentStatus.INVESTIGATING
+            )
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        repository.getIncidents()
+
+        assertEquals(
+            listOf("PATCH_STATUS", "GET"),
+            remote.remoteCalls
+        )
+        assertEquals(
+            0,
+            local.getPendingMutations().size
+        )
+    }
+
+    @Test
+    fun offlineRefreshPreservesOptimisticStatusAndMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            loadError =
+                IllegalStateException("offline GET"),
+            statusUpdateError =
+                IllegalStateException("offline PATCH")
+        )
+
+        val repository =
+            CachedIncidentRepository(remote, local)
+
+        val incidents = repository.getIncidents()
+
+        assertEquals(
+            listOf("PATCH_STATUS", "GET"),
+            remote.remoteCalls
+        )
+        assertEquals(
+            1,
+            local.getPendingMutations().size
+        )
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+        assertEquals(
+            IncidentStatus.INVESTIGATING,
+            incidents.single().status
+        )
+    }
+
     private fun incident(
         id: Long,
         status: IncidentStatus = IncidentStatus.OPEN,
@@ -655,6 +1115,10 @@ private class FakeIncidentDao(
     initialIncidents: List<IncidentEntity> = emptyList()
 ) : IncidentDao {
 
+    private val pendingMutations =
+        mutableListOf<PendingIncidentMutationEntity>()
+
+
     private val incidents =
         initialIncidents.associateBy { it.id }.toMutableMap()
 
@@ -779,6 +1243,35 @@ private class FakeIncidentDao(
         deleteAllIncidents()
         upsertIncidents(incidents)
     }
+
+    override fun queueStatusMutation(
+        incident: IncidentEntity,
+        mutation: PendingIncidentMutationEntity
+    ) {
+        upsertIncident(incident)
+        insertPendingMutation(mutation)
+    }
+
+    override fun insertPendingMutation(
+        mutation: PendingIncidentMutationEntity
+    ): Long {
+        val id =
+            (pendingMutations.maxOfOrNull { it.id } ?: 0L) + 1L
+
+        pendingMutations += mutation.copy(id = id)
+        return id
+    }
+
+    override fun getPendingMutations():
+        List<PendingIncidentMutationEntity> {
+        return pendingMutations.toList()
+    }
+
+    override fun deletePendingMutation(
+        mutationId: Long
+    ) {
+        pendingMutations.removeAll { it.id == mutationId }
+    }
 }
 
 private class FakeRemoteRepository(
@@ -787,8 +1280,10 @@ private class FakeRemoteRepository(
     private val incidentLoadError: Exception? = null,
     private val updatedIncident: Incident? = null,
     private val timelineEvents: List<IncidentTimelineEvent> = emptyList(),
-    private val timelineLoadError: Exception? = null
+    private val timelineLoadError: Exception? = null,
+    private val statusUpdateError: Exception? = null
 ) : IncidentRepository {
+    val remoteCalls = mutableListOf<String>()
 
     var requestedStatus: IncidentStatus? = null
     var requestedSeverity: Severity? = null
@@ -797,6 +1292,7 @@ private class FakeRemoteRepository(
         status: IncidentStatus?,
         severity: Severity?
     ): List<Incident> {
+        remoteCalls += "GET"
         requestedStatus = status
         requestedSeverity = severity
 
@@ -853,10 +1349,17 @@ private class FakeRemoteRepository(
         )
     }
 
+    val statusUpdateCalls =
+        mutableListOf<Pair<Long, IncidentStatus>>()
+
     override fun updateIncidentStatus(
         incidentId: Long,
         status: IncidentStatus
     ): Incident {
+        remoteCalls += "PATCH_STATUS"
+        statusUpdateCalls += incidentId to status
+        statusUpdateError?.let { throw it }
+
         return updatedIncident
             ?: throw IllegalStateException(
                 "No updated incident configured"

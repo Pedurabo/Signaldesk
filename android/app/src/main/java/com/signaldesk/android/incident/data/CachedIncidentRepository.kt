@@ -11,6 +11,7 @@ import com.signaldesk.android.incident.Severity
 import com.signaldesk.android.incident.data.local.IncidentDao
 import com.signaldesk.android.incident.data.local.toDomain
 import com.signaldesk.android.incident.data.local.toEntity
+import com.signaldesk.android.incident.data.local.PendingIncidentMutationEntity
 
 class CachedIncidentRepository(
     private val remote: IncidentRepository,
@@ -46,13 +47,41 @@ class CachedIncidentRepository(
         severity: Severity?
     ): List<Incident> {
         try {
+            syncPendingMutations()
+
             val remoteIncidents = remote.getIncidents(
                 status = null,
                 severity = null
             )
 
+            val pendingStatusByIncident =
+                local.getPendingMutations()
+                    .asSequence()
+                    .filter { it.type == "STATUS_CHANGE" }
+                    .groupBy { it.incidentId }
+                    .mapValues { (_, mutations) ->
+                        mutations.maxByOrNull { it.id }
+                            ?.payload
+                    }
+
+            val mergedIncidents =
+                remoteIncidents.map { incident ->
+                    val pendingStatus =
+                        pendingStatusByIncident[incident.id]
+
+                    if (pendingStatus == null) {
+                        incident
+                    } else {
+                        incident.copy(
+                            status = IncidentStatus.valueOf(
+                                pendingStatus
+                            )
+                        )
+                    }
+                }
+
             local.replaceIncidents(
-                remoteIncidents.map { it.toEntity() }
+                mergedIncidents.map { it.toEntity() }
             )
         } catch (error: Exception) {
             if (error is CancellationException) {
@@ -171,13 +200,73 @@ class CachedIncidentRepository(
         incidentId: Long,
         status: IncidentStatus
     ): Incident {
-        val incident = remote.updateIncidentStatus(
-            incidentId = incidentId,
-            status = status
-        )
+        return try {
+            val incident = remote.updateIncidentStatus(
+                incidentId = incidentId,
+                status = status
+            )
 
-        local.upsertIncident(incident.toEntity())
+            local.upsertIncident(incident.toEntity())
 
-        return incident
+            incident
+        } catch (error: Exception) {
+            if (error is CancellationException) {
+                throw error
+            }
+
+            val cachedIncident =
+                local.getIncident(incidentId)
+                    ?.toDomain()
+                    ?: throw error
+
+            val updatedIncident =
+                cachedIncident.copy(status = status)
+
+            local.queueStatusMutation(
+                incident = updatedIncident.toEntity(),
+                mutation = PendingIncidentMutationEntity(
+                    incidentId = incidentId,
+                    type = "STATUS_CHANGE",
+                    payload = status.name,
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+
+            updatedIncident
+        }
+    }
+
+    fun syncPendingMutations() {
+        val mutations = local.getPendingMutations()
+
+        for (mutation in mutations) {
+            if (mutation.type != "STATUS_CHANGE") {
+                continue
+            }
+
+            try {
+                val incident = remote.updateIncidentStatus(
+                    incidentId = mutation.incidentId,
+                    status = IncidentStatus.valueOf(
+                        mutation.payload
+                    )
+                )
+
+                local.upsertIncident(
+                    incident.toEntity()
+                )
+
+                local.deletePendingMutation(
+                    mutation.id
+                )
+            } catch (error: Exception) {
+                if (error is CancellationException) {
+                    throw error
+                }
+
+                // Keep the mutation queued for a later retry.
+                break
+            }
+        }
     }
 }

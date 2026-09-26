@@ -112,4 +112,33 @@ interface IncidentDao {
         deleteTimelineForIncident(incidentId)
         upsertTimelineEvents(events)
     }
+
+    @Transaction
+    fun queueStatusMutation(
+        incident: IncidentEntity,
+        mutation: PendingIncidentMutationEntity
+    ) {
+        upsertIncident(incident)
+        insertPendingMutation(mutation)
+    }
+
+    @Insert
+    fun insertPendingMutation(
+        mutation: PendingIncidentMutationEntity
+    ): Long
+
+    @Query(
+        """
+        SELECT * FROM pending_incident_mutations
+        ORDER BY id ASC
+        """
+    )
+    fun getPendingMutations(): List<PendingIncidentMutationEntity>
+
+    @Query(
+        "DELETE FROM pending_incident_mutations WHERE id = :mutationId"
+    )
+    fun deletePendingMutation(
+        mutationId: Long
+    )
 }

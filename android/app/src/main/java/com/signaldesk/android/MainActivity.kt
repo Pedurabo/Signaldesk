@@ -24,7 +24,8 @@ class MainActivity : ComponentActivity() {
             "signaldesk.db"
         )
             .addMigrations(
-                SignalDeskDatabase.MIGRATION_1_2
+                SignalDeskDatabase.MIGRATION_1_2,
+                SignalDeskDatabase.MIGRATION_2_3
             )
             .build()
     }
