@@ -31,6 +31,20 @@ android {
 
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(
+                providers.gradleProperty("SIGNALDESK_KEYSTORE_FILE").get()
+            )
+            storePassword =
+                providers.gradleProperty("SIGNALDESK_KEYSTORE_PASSWORD").get()
+            keyAlias =
+                providers.gradleProperty("SIGNALDESK_KEY_ALIAS").get()
+            keyPassword =
+                providers.gradleProperty("SIGNALDESK_KEY_PASSWORD").get()
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField(
@@ -41,6 +55,7 @@ android {
         }
 
         release {
+            signingConfig = signingConfigs.getByName("release")
             val signaldeskBaseUrl =
                 providers.gradleProperty("signaldeskBaseUrl")
                     .orNull
