@@ -219,4 +219,41 @@ class IncidentListScreenTest {
             }
         }
     }
+
+    @Test
+    fun refreshFailureKeepsCachedIncidentVisible() {
+        val incident = Incident(
+            id = 504,
+            title = "Cached offline incident",
+            description = "Cached incident remains available after refresh failure",
+            severity = Severity.HIGH,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = listOf(incident),
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = "Backend unavailable",
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {},
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onRefresh = {},
+                    onCreateIncidentClick = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Cached offline incident")
+            .assertIsDisplayed()
+
+        composeRule
+            .onNodeWithText("Refresh failed: Backend unavailable")
+            .assertIsDisplayed()
+    }
 }

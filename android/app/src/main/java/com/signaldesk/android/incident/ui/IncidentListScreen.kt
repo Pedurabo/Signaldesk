@@ -89,7 +89,7 @@ fun IncidentListScreen(
                 )
             }
 
-            error != null -> {
+            error != null && incidents.isEmpty() -> {
                 ErrorContent(
                     error = error,
                     modifier = Modifier
@@ -112,6 +112,15 @@ fun IncidentListScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("incident_refresh_indicator")
+                            )
+                        }
+                    }
+
+                    if (error != null) {
+                        item {
+                            Text(
+                                text = "Refresh failed: $error",
+                                style = MaterialTheme.typography.bodyMedium
                             )
                         }
                     }
