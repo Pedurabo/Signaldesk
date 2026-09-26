@@ -955,6 +955,107 @@ class IncidentDetailViewModelTest {
         assertNull(viewModel.uiState.value.incident)
         assertTrue(viewModel.uiState.value.timeline.isEmpty())
     }
+
+    @Test
+    fun loadingIncidentAfterClearStartsFreshObservers() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+
+        val incidentA = Incident(
+            id = 801,
+            title = "Incident A",
+            description = "First incident",
+            severity = Severity.HIGH,
+            status = IncidentStatus.OPEN
+        )
+
+        val incidentB = Incident(
+            id = 802,
+            title = "Incident B",
+            description = "Second incident",
+            severity = Severity.CRITICAL,
+            status = IncidentStatus.INVESTIGATING
+        )
+
+        val updatedIncidentB = incidentB.copy(
+            title = "Incident B updated",
+            status = IncidentStatus.RESOLVED
+        )
+
+        val timelineA = listOf(
+            IncidentTimelineEvent(
+                id = 1101,
+                type = IncidentTimelineEventType.CREATED,
+                message = "Incident A created",
+                createdAt = "2026-09-26T01:00:00Z"
+            )
+        )
+
+        val timelineB = listOf(
+            IncidentTimelineEvent(
+                id = 1201,
+                type = IncidentTimelineEventType.CREATED,
+                message = "Incident B created",
+                createdAt = "2026-09-26T02:00:00Z"
+            )
+        )
+
+        val updatedTimelineB = timelineB + IncidentTimelineEvent(
+            id = 1202,
+            type = IncidentTimelineEventType.NOTE_ADDED,
+            message = "Fresh observer received this",
+            createdAt = "2026-09-26T02:01:00Z"
+        )
+
+        val repository = TestIncidentDetailRepository(
+            incident = incidentA,
+            timeline = timelineA
+        )
+
+        val observableRepository =
+            TestObservableIncidentDetailRepository(
+                incident = incidentA
+            )
+
+        val observableTimelineRepository =
+            TestObservableIncidentTimelineRepository(
+                timeline = timelineA
+            )
+
+        val viewModel = IncidentDetailViewModel(
+            repository = repository,
+            observableRepository = observableRepository,
+            observableTimelineRepository =
+                observableTimelineRepository,
+            ioDispatcher = testDispatcher
+        )
+
+        viewModel.loadIncident(incidentA.id)
+        viewModel.loadIncidentTimeline(incidentA.id)
+        advanceUntilIdle()
+
+        viewModel.clearIncident()
+
+        observableRepository.emit(incidentB)
+        observableTimelineRepository.emit(timelineB)
+
+        viewModel.loadIncident(incidentB.id)
+        viewModel.loadIncidentTimeline(incidentB.id)
+        advanceUntilIdle()
+
+        observableRepository.emit(updatedIncidentB)
+        observableTimelineRepository.emit(updatedTimelineB)
+        advanceUntilIdle()
+
+        assertEquals(
+            updatedIncidentB,
+            viewModel.uiState.value.incident
+        )
+
+        assertEquals(
+            updatedTimelineB,
+            viewModel.uiState.value.timeline
+        )
+    }
 }
 
 private class TestObservableIncidentDetailRepository(
