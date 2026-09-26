@@ -17,7 +17,8 @@ class SignalDeskApplication : Application() {
         )
             .addMigrations(
                 SignalDeskDatabase.MIGRATION_1_2,
-                SignalDeskDatabase.MIGRATION_2_3
+                SignalDeskDatabase.MIGRATION_2_3,
+                SignalDeskDatabase.MIGRATION_3_4
             )
             .build()
     }
