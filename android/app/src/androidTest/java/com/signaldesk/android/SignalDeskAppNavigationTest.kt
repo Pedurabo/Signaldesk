@@ -1,9 +1,13 @@
 package com.signaldesk.android
 
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
+
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.signaldesk.android.incident.data.FakeIncidentRepository
 import com.signaldesk.android.incident.ui.IncidentDetailViewModel
 import com.signaldesk.android.incident.ui.IncidentListViewModel
@@ -55,6 +59,64 @@ class SignalDeskAppNavigationTest {
 
         composeRule
             .onNodeWithText("INVESTIGATING")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun creatingIncidentNavigatesToCreatedIncidentDetail() {
+        val repository = FakeIncidentRepository()
+
+        val listViewModel = IncidentListViewModel(
+            repository = repository,
+            ioDispatcher = Dispatchers.Main
+        )
+
+        val detailViewModel = IncidentDetailViewModel(
+            repository = repository,
+            ioDispatcher = Dispatchers.Main
+        )
+
+        composeRule.setContent {
+            SignalDeskTheme {
+                SignalDeskApp(
+                    listViewModel = listViewModel,
+                    detailViewModel = detailViewModel
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Create")
+            .performClick()
+
+        composeRule
+            .onNodeWithText("Title")
+            .performTextInput("Checkout API latency")
+
+        composeRule
+            .onNodeWithText("Description")
+            .performTextInput(
+                "Checkout requests exceed latency threshold"
+            )
+
+        composeRule
+            .onNodeWithText("CRITICAL")
+            .performClick()
+
+        composeRule
+            .onNode(hasText("Create incident") and hasClickAction())
+            .performClick()
+
+        composeRule
+            .onNodeWithText("Incident #43")
+            .assertIsDisplayed()
+
+        composeRule
+            .onNodeWithText("Checkout API latency")
+            .assertIsDisplayed()
+
+        composeRule
+            .onNodeWithText("OPEN")
             .assertIsDisplayed()
     }
 }

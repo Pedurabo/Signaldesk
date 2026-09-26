@@ -30,7 +30,7 @@ android {
 
         val signaldeskBaseUrl =
             providers.gradleProperty("signaldeskBaseUrl")
-                .orElse("http://10.0.2.2:8082")
+                .orElse("http://127.0.0.1:8082")
 
         buildConfigField(
             "String",
