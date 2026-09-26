@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import com.signaldesk.android.incident.Incident
 import com.signaldesk.android.incident.IncidentStatus
 import com.signaldesk.android.incident.Severity
@@ -256,4 +258,48 @@ class IncidentListScreenTest {
             .onNodeWithText("Refresh failed: Backend unavailable")
             .assertIsDisplayed()
     }
+
+    @Test
+    fun pullingDownInvokesRefreshCallback() {
+        var refreshCount = 0
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = listOf(
+                        Incident(
+                            id = 504,
+                            title = "Pull refresh incident",
+                            description = "Incident used for pull-to-refresh test",
+                            severity = Severity.HIGH,
+                            status = IncidentStatus.OPEN
+                        )
+                    ),
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = null,
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {},
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onRefresh = { refreshCount++ },
+                    onCreateIncidentClick = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithTag("incident_list")
+            .performTouchInput {
+                swipeDown()
+            }
+
+        composeRule.runOnIdle {
+            assert(refreshCount == 1) {
+                "Expected one refresh callback but was $refreshCount"
+            }
+        }
+    }
+
 }

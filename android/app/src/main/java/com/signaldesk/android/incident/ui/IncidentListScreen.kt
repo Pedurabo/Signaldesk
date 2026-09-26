@@ -16,6 +16,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -99,56 +100,63 @@ fun IncidentListScreen(
             }
 
             else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = onRefresh,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    if (isRefreshing) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .testTag("incident_list"),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (isRefreshing) {
+                            item {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("incident_refresh_indicator")
+                                )
+                            }
+                        }
+
+                        if (error != null) {
+                            item {
+                                Text(
+                                    text = "Refresh failed: $error",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+
                         item {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .testTag("incident_refresh_indicator")
+                            IncidentFilters(
+                                selectedStatus = selectedStatus,
+                                selectedSeverity = selectedSeverity,
+                                onStatusFilterChange = onStatusFilterChange,
+                                onSeverityFilterChange = onSeverityFilterChange
                             )
                         }
-                    }
 
-                    if (error != null) {
-                        item {
-                            Text(
-                                text = "Refresh failed: $error",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-
-                    item {
-                        IncidentFilters(
-                            selectedStatus = selectedStatus,
-                            selectedSeverity = selectedSeverity,
-                            onStatusFilterChange = onStatusFilterChange,
-                            onSeverityFilterChange = onSeverityFilterChange
-                        )
-                    }
-
-                    if (incidents.isEmpty()) {
-                        item {
-                            FilteredEmptyContent()
-                        }
-                    } else {
-                        items(
-                            items = incidents,
-                            key = { incident -> incident.id }
-                        ) { incident ->
-                            IncidentCard(
-                                incident = incident,
-                                onClick = {
-                                    onIncidentClick(incident)
-                                }
-                            )
+                        if (incidents.isEmpty()) {
+                            item {
+                                FilteredEmptyContent()
+                            }
+                        } else {
+                            items(
+                                items = incidents,
+                                key = { incident -> incident.id }
+                            ) { incident ->
+                                IncidentCard(
+                                    incident = incident,
+                                    onClick = {
+                                        onIncidentClick(incident)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
