@@ -149,6 +149,20 @@ interface IncidentDao {
     ): Flow<Boolean>
 
     @Query(
+        """
+        UPDATE pending_incident_mutations
+        SET attemptCount = attemptCount + 1,
+            lastAttemptAt = :attemptedAt,
+            lastError = :error
+        WHERE id = :mutationId
+        """
+    )
+    fun recordPendingMutationFailure(
+        mutationId: Long,
+        attemptedAt: Long,
+        error: String
+    )
+    @Query(
         "DELETE FROM pending_incident_mutations WHERE id = :mutationId"
     )
     fun deletePendingMutation(

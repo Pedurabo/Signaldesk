@@ -17,6 +17,7 @@ import com.signaldesk.android.incident.data.local.IncidentEntity
 import com.signaldesk.android.incident.data.local.IncidentTimelineEventEntity
 import com.signaldesk.android.incident.data.local.toEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import com.signaldesk.android.incident.data.local.PendingIncidentMutationEntity
@@ -685,11 +686,221 @@ class CachedIncidentRepositoryTest {
             mutations.single().payload
         )
         assertEquals(
+            1,
+            mutations.single().attemptCount
+        )
+        assertNotNull(
+            mutations.single().lastAttemptAt
+        )
+        assertEquals(
+            "offline",
+            mutations.single().lastError
+        )
+        assertEquals(
             "INVESTIGATING",
             local.getIncident(41)?.status
         )
     }
 
+    @Test
+    fun repeatedFailedSyncIncrementsPendingMutationAttemptCount() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "INVESTIGATING",
+                createdAt = 1L
+            )
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = FakeRemoteRepository(
+                statusUpdateError =
+                    IllegalStateException("offline")
+            ),
+            local = local
+        )
+
+        val firstResult =
+            repository.syncPendingMutations()
+
+        val firstAttempt =
+            local.getPendingMutations()
+
+        assertEquals(
+            PendingMutationSyncResult.RETRY_NEEDED,
+            firstResult
+        )
+        assertEquals(1, firstAttempt.size)
+        assertEquals(
+            1,
+            firstAttempt.single().attemptCount
+        )
+        assertNotNull(
+            firstAttempt.single().lastAttemptAt
+        )
+        assertEquals(
+            "offline",
+            firstAttempt.single().lastError
+        )
+
+        val secondResult =
+            repository.syncPendingMutations()
+
+        val secondAttempt =
+            local.getPendingMutations()
+
+        assertEquals(
+            PendingMutationSyncResult.RETRY_NEEDED,
+            secondResult
+        )
+
+        // The same outbox row remains queued.
+        assertEquals(1, secondAttempt.size)
+        assertEquals(
+            firstAttempt.single().id,
+            secondAttempt.single().id
+        )
+
+        // Retry history advances instead of resetting.
+        assertEquals(
+            2,
+            secondAttempt.single().attemptCount
+        )
+        assertNotNull(
+            secondAttempt.single().lastAttemptAt
+        )
+        assertEquals(
+            "offline",
+            secondAttempt.single().lastError
+        )
+
+        // Optimistic local state remains intact.
+        assertEquals(
+            "INVESTIGATING",
+            local.getIncident(41)?.status
+        )
+    }
+    @Test
+    fun successfulRetryRemovesPreviouslyFailedMutation() {
+        val local = FakeIncidentDao(
+            initialIncidents = listOf(
+                incident(
+                    id = 41,
+                    status = IncidentStatus.INVESTIGATING
+                ).toEntity()
+            )
+        )
+
+        local.insertPendingMutation(
+            PendingIncidentMutationEntity(
+                incidentId = 41,
+                type = "STATUS_CHANGE",
+                payload = "RESOLVED",
+                createdAt = 1L
+            )
+        )
+
+        val remote = FakeRemoteRepository(
+            statusUpdateError =
+                IllegalStateException("offline"),
+            updatedIncident = incident(
+                id = 41,
+                status = IncidentStatus.RESOLVED
+            ),
+            statusUpdateFailuresRemaining = 1
+        )
+
+        val repository = CachedIncidentRepository(
+            remote = remote,
+            local = local
+        )
+
+        // -----------------------------------------------------
+        // First replay fails
+        // -----------------------------------------------------
+
+        val failedResult =
+            repository.syncPendingMutations()
+
+        val failedMutation =
+            local.getPendingMutations()
+
+        assertEquals(
+            PendingMutationSyncResult.RETRY_NEEDED,
+            failedResult
+        )
+        assertEquals(1, failedMutation.size)
+        assertEquals(
+            1,
+            failedMutation.single().attemptCount
+        )
+        assertNotNull(
+            failedMutation.single().lastAttemptAt
+        )
+        assertEquals(
+            "offline",
+            failedMutation.single().lastError
+        )
+
+        val failedMutationId =
+            failedMutation.single().id
+
+        // -----------------------------------------------------
+        // Network recovers automatically after the configured
+        // one transient failure.
+        // -----------------------------------------------------
+
+        val successfulResult =
+            repository.syncPendingMutations()
+
+        // -----------------------------------------------------
+        // Previously failed mutation must now be gone
+        // -----------------------------------------------------
+
+        assertEquals(
+            PendingMutationSyncResult.COMPLETED,
+            successfulResult
+        )
+
+        assertEquals(
+            0,
+            local.getPendingMutations().size
+        )
+
+        // Server-confirmed state must be persisted locally.
+        assertEquals(
+            "RESOLVED",
+            local.getIncident(41)?.status
+        )
+
+        // The successful retry operated on the same incident.
+        assertEquals(
+            listOf(
+                41L to IncidentStatus.INVESTIGATING,
+                41L to IncidentStatus.RESOLVED
+            ).size,
+            remote.statusUpdateCalls.size
+        )
+
+        // The mutation that failed was not replaced by
+        // another queued mutation.
+        assertEquals(
+            true,
+            local.getPendingMutations().none {
+                it.id == failedMutationId
+            }
+        )
+    }
     @Test
     fun syncReplaysStatusMutationsInOrder() {
         val local = FakeIncidentDao(
@@ -1368,6 +1579,33 @@ private class FakeIncidentDao(
         return pendingMutations.toList()
     }
 
+    override fun recordPendingMutationFailure(
+        mutationId: Long,
+        attemptedAt: Long,
+        error: String
+    ) {
+        val index =
+            pendingMutations.indexOfFirst {
+                it.id == mutationId
+            }
+
+        if (index < 0) {
+            return
+        }
+
+        val mutation = pendingMutations[index]
+
+        pendingMutations[index] =
+            mutation.copy(
+                attemptCount =
+                    mutation.attemptCount + 1,
+                lastAttemptAt = attemptedAt,
+                lastError = error
+            )
+
+        pendingMutationState.value =
+            pendingMutations.toList()
+    }
     override fun deletePendingMutation(
         mutationId: Long
     ) {
@@ -1394,7 +1632,8 @@ private class FakeRemoteRepository(
     private val updatedIncident: Incident? = null,
     private val timelineEvents: List<IncidentTimelineEvent> = emptyList(),
     private val timelineLoadError: Exception? = null,
-    private val statusUpdateError: Exception? = null
+    private val statusUpdateError: Exception? = null,
+    private var statusUpdateFailuresRemaining: Int = -1
 ) : IncidentRepository {
     val remoteCalls = mutableListOf<String>()
 
@@ -1471,7 +1710,18 @@ private class FakeRemoteRepository(
     ): Incident {
         remoteCalls += "PATCH_STATUS"
         statusUpdateCalls += incidentId to status
-        statusUpdateError?.let { throw it }
+        if (statusUpdateFailuresRemaining > 0) {
+            statusUpdateFailuresRemaining -= 1
+
+            throw statusUpdateError
+                ?: IllegalStateException(
+                    "Configured status update failure"
+                )
+        }
+
+        if (statusUpdateFailuresRemaining < 0) {
+            statusUpdateError?.let { throw it }
+        }
 
         return updatedIncident
             ?: throw IllegalStateException(

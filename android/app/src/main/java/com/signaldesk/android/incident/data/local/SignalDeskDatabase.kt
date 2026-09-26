@@ -11,7 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         IncidentTimelineEventEntity::class,
         PendingIncidentMutationEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class SignalDeskDatabase : RoomDatabase() {
@@ -54,6 +54,34 @@ abstract class SignalDeskDatabase : RoomDatabase() {
                             payload TEXT NOT NULL,
                             createdAt INTEGER NOT NULL
                         )
+                        """.trimIndent()
+                    )
+                }
+            }
+
+        val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(
+                    db: SupportSQLiteDatabase
+                ) {
+                    db.execSQL(
+                        """
+                        ALTER TABLE pending_incident_mutations
+                        ADD COLUMN attemptCount INTEGER NOT NULL DEFAULT 0
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE pending_incident_mutations
+                        ADD COLUMN lastAttemptAt INTEGER
+                        """.trimIndent()
+                    )
+
+                    db.execSQL(
+                        """
+                        ALTER TABLE pending_incident_mutations
+                        ADD COLUMN lastError TEXT
                         """.trimIndent()
                     )
                 }

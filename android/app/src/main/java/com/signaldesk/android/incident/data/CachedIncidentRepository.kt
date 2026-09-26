@@ -283,6 +283,13 @@ class CachedIncidentRepository(
                     throw error
                 }
 
+                local.recordPendingMutationFailure(
+                    mutationId = mutation.id,
+                    attemptedAt = System.currentTimeMillis(),
+                    error = error.message
+                        ?: error::class.java.simpleName
+                )
+
                 // Keep the mutation queued for a later retry.
                 return PendingMutationSyncResult.RETRY_NEEDED
             }

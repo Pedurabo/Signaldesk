@@ -10,5 +10,8 @@ data class PendingIncidentMutationEntity(
     val incidentId: Long,
     val type: String,
     val payload: String,
-    val createdAt: Long
+    val createdAt: Long,
+    val attemptCount: Int = 0,
+    val lastAttemptAt: Long? = null,
+    val lastError: String? = null
 )
