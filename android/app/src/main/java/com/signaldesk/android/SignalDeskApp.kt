@@ -66,6 +66,7 @@ fun SignalDeskApp(
                         "incidents/${clickedIncident.id}"
                     )
                 },
+                onRefresh = listViewModel::refreshIncidents,
                 onCreateIncidentClick = {
                     navController.navigate(
                         CREATE_INCIDENT_ROUTE

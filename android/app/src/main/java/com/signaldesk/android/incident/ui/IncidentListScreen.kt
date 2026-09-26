@@ -45,6 +45,7 @@ fun IncidentListScreen(
     onStatusFilterChange: (IncidentStatus?) -> Unit,
     onSeverityFilterChange: (Severity?) -> Unit,
     onIncidentClick: (Incident) -> Unit,
+    onRefresh: () -> Unit,
     onCreateIncidentClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -62,6 +63,13 @@ fun IncidentListScreen(
                     }
                 },
                 actions = {
+                    TextButton(
+                        onClick = onRefresh,
+                        enabled = !isRefreshing
+                    ) {
+                        Text("Refresh")
+                    }
+
                     TextButton(
                         onClick = onCreateIncidentClick
                     ) {

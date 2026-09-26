@@ -40,6 +40,7 @@ class IncidentListScreenTest {
                     onStatusFilterChange = {},
                     onSeverityFilterChange = {},
                     onIncidentClick = {},
+                    onRefresh = {},
                     onCreateIncidentClick = {}
                 )
             }
@@ -91,6 +92,7 @@ class IncidentListScreenTest {
                     onIncidentClick = {
                         clickedIncident = it
                     },
+                    onRefresh = {},
                     onCreateIncidentClick = {}
                 )
             }
@@ -124,6 +126,7 @@ class IncidentListScreenTest {
                     },
                     onSeverityFilterChange = {},
                     onIncidentClick = {},
+                    onRefresh = {},
                     onCreateIncidentClick = {}
                 )
             }
@@ -167,6 +170,7 @@ class IncidentListScreenTest {
                     onStatusFilterChange = {},
                     onSeverityFilterChange = {},
                     onIncidentClick = {},
+                    onRefresh = {},
                     onCreateIncidentClick = {}
                 )
             }
@@ -179,5 +183,40 @@ class IncidentListScreenTest {
         composeRule
             .onNodeWithText("Cached checkout incident")
             .assertIsDisplayed()
+    }
+
+    @Test
+    fun clickingRefreshInvokesRefreshCallback() {
+        var refreshClicked = false
+
+        composeRule.setContent {
+            MaterialTheme {
+                IncidentListScreen(
+                    incidents = emptyList(),
+                    isLoading = false,
+                    isRefreshing = false,
+                    error = null,
+                    selectedStatus = null,
+                    selectedSeverity = null,
+                    onStatusFilterChange = {},
+                    onSeverityFilterChange = {},
+                    onIncidentClick = {},
+                    onRefresh = {
+                        refreshClicked = true
+                    },
+                    onCreateIncidentClick = {}
+                )
+            }
+        }
+
+        composeRule
+            .onNodeWithText("Refresh")
+            .performClick()
+
+        composeRule.runOnIdle {
+            assert(refreshClicked) {
+                "Expected refresh callback to be invoked"
+            }
+        }
     }
 }
